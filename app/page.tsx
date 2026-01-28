@@ -5,6 +5,7 @@ import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { IterationBlock } from '@/components/dossier/iteration-block';
 import { RightPanel } from '@/components/dossier/right-panel';
+import { MessageSquare, Bot, Clock } from 'lucide-react';
 import type { Iteration, ContextDoc, CodeFile, ProjectContext } from '@/components/dossier/types';
 
 // Sample data structure with iterations
@@ -549,31 +550,70 @@ export default function DossierPage() {
         />
 
         {/* Center - Iteration Blocks (vertically stacked, each with side-scrollable story map) */}
-        <div className="flex-1 overflow-y-auto bg-background">
-          {iterations.map((iteration) => (
-            <IterationBlock
-              key={iteration.id}
-              iteration={iteration}
-              viewMode={viewMode}
-              expandedCardId={expandedCardId}
-              onExpandCard={setExpandedCardId}
-              onCardAction={handleCardAction}
-              onUpdateCardDescription={handleUpdateCardDescription}
-              onUpdateQuickAnswer={handleUpdateQuickAnswer}
-              onUpdateFileDescription={handleUpdateFileDescription}
-              onSelectDoc={(doc) => {
-                setSelectedDoc(doc);
-                setRightPanelTab('docs');
-                setRightPanelOpen(true);
-              }}
-              onFileClick={(file) => {
-                setSelectedFile(file);
-                setRightPanelTab('terminal');
-                setRightPanelOpen(true);
-              }}
-              projectContext={projectContext}
-            />
-          ))}
+        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+          {/* Project Context Banner - Fixed at top */}
+          <div className="shrink-0 bg-secondary/80 backdrop-blur border-b border-border px-6 py-4">
+            <div className="flex items-start justify-between gap-6">
+              {/* User's original request */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">
+                  <MessageSquare className="h-3 w-3" />
+                  Your Request
+                </div>
+                <p className="text-sm text-foreground font-medium leading-relaxed">
+                  "{projectContext.userRequest}"
+                </p>
+              </div>
+              
+              {/* Agent status */}
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <Bot className="h-3.5 w-3.5 text-green-500" />
+                    <span className="text-green-500 font-mono font-bold">{projectContext.activeAgents}</span>
+                    <span className="text-muted-foreground">agents working</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>Updated {projectContext.lastUpdate}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Explanation */}
+            <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+              This implementation map was generated from your request. Each card represents a task agents are working on. 
+              <span className="text-foreground"> Click any card</span> to see details, provide answers, or guide the work.
+            </p>
+          </div>
+
+          {/* Iterations */}
+          <div className="flex-1 overflow-y-auto">
+            {iterations.map((iteration) => (
+              <IterationBlock
+                key={iteration.id}
+                iteration={iteration}
+                viewMode={viewMode}
+                expandedCardId={expandedCardId}
+                onExpandCard={setExpandedCardId}
+                onCardAction={handleCardAction}
+                onUpdateCardDescription={handleUpdateCardDescription}
+                onUpdateQuickAnswer={handleUpdateQuickAnswer}
+                onUpdateFileDescription={handleUpdateFileDescription}
+                onSelectDoc={(doc) => {
+                  setSelectedDoc(doc);
+                  setRightPanelTab('docs');
+                  setRightPanelOpen(true);
+                }}
+                onFileClick={(file) => {
+                  setSelectedFile(file);
+                  setRightPanelTab('terminal');
+                  setRightPanelOpen(true);
+                }}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Right Panel - Files/Terminal/Docs (Collapsible) */}
