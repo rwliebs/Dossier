@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -15,16 +15,32 @@ import {
   X,
   Copy,
   ExternalLink,
+  MessageSquare,
+  Bot,
+  User,
+  Send,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import type { ContextDoc, CodeFile } from "./types";
+
+interface Message {
+  id: string;
+  role: 'user' | 'agent';
+  content: string;
+  timestamp: Date;
+}
 
 interface RightPanelProps {
   isOpen: boolean;
   onClose: () => void;
   activeDoc: ContextDoc | null;
   activeFile: CodeFile | null;
-  activeTab: "files" | "terminal" | "docs";
-  onTabChange: (tab: "files" | "terminal" | "docs") => void;
+  activeTab: "files" | "terminal" | "docs" | "chat";
+  onTabChange: (tab: "files" | "terminal" | "docs" | "chat") => void;
+  // Chat/ideation props
+  isIdeationMode?: boolean;
+  onIdeationComplete?: (request: string) => void;
 }
 
 interface FileNode {

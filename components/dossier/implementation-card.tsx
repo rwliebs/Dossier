@@ -127,13 +127,10 @@ export function ImplementationCard({
 
   return (
     <div
-      className={`border-2 rounded transition-all cursor-pointer group ${config.bg} ${config.border}`}
+      className={`border-2 rounded transition-all group ${config.bg} ${config.border}`}
     >
       {/* Collapsed View */}
-      <div
-        className="p-3 space-y-2"
-        onClick={() => onExpand(card.id)}
-      >
+      <div className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
             <h4 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text}`}>
@@ -189,13 +186,7 @@ export function ImplementationCard({
               </div>
             )}
           </div>
-          {!isEditingDescription && (
-            <ChevronDown
-              className={`h-3 w-3 transition-transform flex-shrink-0 ${
-                isExpanded ? 'rotate-180' : ''
-              }`}
-            />
-          )}
+
         </div>
 
         {/* Status Badge + Context Tags */}
@@ -227,8 +218,21 @@ export function ImplementationCard({
           </div>
         )}
 
-        {/* Action Button */}
-        <div className="pt-2">
+        {/* Action Buttons */}
+        <div className="pt-2 space-y-2">
+          {/* View Details - Primary CTA when collapsed */}
+          {!isExpanded && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onExpand(card.id);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold bg-foreground text-background rounded hover:bg-foreground/90 transition-colors"
+            >
+              <ChevronDown className="h-4 w-4" />
+              View Details & Edit
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -243,156 +247,167 @@ export function ImplementationCard({
 
       {/* Expanded View */}
       {isExpanded && (
-        <div className="border-t-2 p-4 space-y-4 bg-white/50" onClick={(e) => e.stopPropagation()}>
-          {/* Requirements */}
-          {card.requirements.length > 0 && (
-            <div>
-              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
-                Requirements
-              </h5>
-              <ul className="space-y-1">
-                {card.requirements.map((req, idx) => (
-                  <li key={idx} className="text-xs text-gray-600">
-                    • {req}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Context Docs */}
-          {sortedDocs.length > 0 && (
-            <div>
-              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
-                Context
-              </h5>
-              <div className="space-y-1">
-                {sortedDocs.map((doc) => (
-                  <button
-                    key={doc.id}
-                    onClick={() => onSelectDoc?.(doc)}
-                    className="block w-full text-left text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:border-gray-400 transition-colors text-gray-700"
-                  >
-                    {doc.name}
-                  </button>
-                ))}
+        <div className="border-t-2 bg-white/50" onClick={(e) => e.stopPropagation()}>
+          <div className="p-4 space-y-4">
+            {/* Requirements */}
+            {card.requirements.length > 0 && (
+              <div>
+                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
+                  Requirements
+                </h5>
+                <ul className="space-y-1">
+                  {card.requirements.map((req, idx) => (
+                    <li key={idx} className="text-xs text-gray-600">
+                      • {req}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
-          )}
-
-          {/* Test Files - shown for all expanded cards */}
-          <div>
-            <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
-              Tests
-            </h5>
-            {testFiles.length > 0 ? (
-              <div className="space-y-1">
-                {testFiles.map((file) => (
-                  <button
-                    key={file.id}
-                    onClick={() => onSelectFile?.(file)}
-                    className="block w-full text-left text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:border-gray-400 transition-colors text-gray-700"
-                  >
-                    {file.name}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-500 italic">No tests assigned</p>
             )}
-          </div>
 
-          {/* Known Facts */}
-          {card.knownFacts.length > 0 && (
+            {/* Context Docs */}
+            {sortedDocs.length > 0 && (
+              <div>
+                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
+                  Context
+                </h5>
+                <div className="space-y-1">
+                  {sortedDocs.map((doc) => (
+                    <button
+                      key={doc.id}
+                      onClick={() => onSelectDoc?.(doc)}
+                      className="block w-full text-left text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:border-gray-400 transition-colors text-gray-700"
+                    >
+                      {doc.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Test Files - shown for all expanded cards */}
             <div>
               <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
-                Known Facts
+                Tests
               </h5>
-              <ul className="space-y-1">
-                {card.knownFacts.map((fact) => (
-                  <li key={fact.id} className="text-xs text-gray-600">
-                    • {fact.text}
-                    {fact.source && <span className="text-[10px] ml-1">({fact.source})</span>}
-                  </li>
-                ))}
-              </ul>
+              {testFiles.length > 0 ? (
+                <div className="space-y-1">
+                  {testFiles.map((file) => (
+                    <button
+                      key={file.id}
+                      onClick={() => onSelectFile?.(file)}
+                      className="block w-full text-left text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:border-gray-400 transition-colors text-gray-700"
+                    >
+                      {file.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 italic">No tests assigned</p>
+              )}
             </div>
-          )}
 
-          {/* Assumptions */}
-          {card.assumptions.length > 0 && (
-            <div>
-              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
-                Assumptions
-              </h5>
-              <ul className="space-y-1">
-                {card.assumptions.map((assumption) => (
-                  <li key={assumption.id} className="text-xs text-gray-600 cursor-pointer hover:text-gray-900">
-                    • {assumption.text}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+            {/* Known Facts */}
+            {card.knownFacts.length > 0 && (
+              <div>
+                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
+                  Known Facts
+                </h5>
+                <ul className="space-y-1">
+                  {card.knownFacts.map((fact) => (
+                    <li key={fact.id} className="text-xs text-gray-600">
+                      • {fact.text}
+                      {fact.source && <span className="text-[10px] ml-1">({fact.source})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          {/* Questions - Shared Input for Users & Agents */}
-          {card.questions.length > 0 && (
-            <div>
-              <h5 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-2">
-                Questions
-              </h5>
-              <ul className="space-y-1 mb-3">
-                {card.questions.map((question) => (
-                  <li key={question.id} className="text-xs text-gray-600">
-                    • {question.text}
-                  </li>
-                ))}
-              </ul>
+            {/* Assumptions */}
+            {card.assumptions.length > 0 && (
+              <div>
+                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>
+                  Assumptions
+                </h5>
+                <ul className="space-y-1">
+                  {card.assumptions.map((assumption) => (
+                    <li key={assumption.id} className="text-xs text-gray-600 cursor-pointer hover:text-gray-900">
+                      • {assumption.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-              {/* Answer/Response Box */}
-              <div className="border-t border-yellow-200 pt-2">
-                {isEditingQuickAnswer ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={editedQuickAnswer}
-                      onChange={(e) => setEditedQuickAnswer(e.target.value)}
-                      className="w-full text-xs p-2 bg-white border border-gray-300 rounded text-gray-900"
-                      placeholder="Provide an answer or clarification..."
-                      rows={2}
-                    />
-                    <div className="flex gap-2">
+            {/* Questions - Shared Input for Users & Agents */}
+            {card.questions.length > 0 && (
+              <div>
+                <h5 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-2">
+                  Questions
+                </h5>
+                <ul className="space-y-1 mb-3">
+                  {card.questions.map((question) => (
+                    <li key={question.id} className="text-xs text-gray-600">
+                      • {question.text}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Answer/Response Box */}
+                <div className="border-t border-yellow-200 pt-2">
+                  {isEditingQuickAnswer ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editedQuickAnswer}
+                        onChange={(e) => setEditedQuickAnswer(e.target.value)}
+                        className="w-full text-xs p-2 bg-white border border-gray-300 rounded text-gray-900"
+                        placeholder="Provide an answer or clarification..."
+                        rows={2}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveQuickAnswer}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelQuickAnswer}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                        >
+                          <X className="h-3 w-3" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="group/answer flex items-start gap-2">
+                      <p className="text-xs text-gray-600 flex-1 leading-relaxed">
+                        {card.quickAnswer || 'Awaiting response...'}
+                      </p>
                       <button
-                        onClick={handleSaveQuickAnswer}
-                        className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700"
+                        onClick={() => setIsEditingQuickAnswer(true)}
+                        className="opacity-0 group-hover/answer:opacity-100 transition-opacity p-1 hover:bg-black/5 rounded"
                       >
-                        <Check className="h-3 w-3" />
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelQuickAnswer}
-                        className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                      >
-                        <X className="h-3 w-3" />
-                        Cancel
+                        <Edit2 className="h-3 w-3 text-gray-400" />
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="group/answer flex items-start gap-2">
-                    <p className="text-xs text-gray-600 flex-1 leading-relaxed">
-                      {card.quickAnswer || 'Awaiting response...'}
-                    </p>
-                    <button
-                      onClick={() => setIsEditingQuickAnswer(true)}
-                      className="opacity-0 group-hover/answer:opacity-100 transition-opacity p-1 hover:bg-black/5 rounded"
-                    >
-                      <Edit2 className="h-3 w-3 text-gray-400" />
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            
+            {/* Collapse Button */}
+            <button
+              onClick={() => onExpand(card.id)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-2 text-xs font-semibold bg-secondary text-foreground rounded hover:bg-secondary/80 transition-colors border border-border"
+            >
+              <ChevronDown className="h-4 w-4 rotate-180" />
+              Collapse
+            </button>
+          </div>
         </div>
       )}
     </div>

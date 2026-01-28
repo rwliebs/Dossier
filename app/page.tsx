@@ -5,7 +5,7 @@ import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { IterationBlock } from '@/components/dossier/iteration-block';
 import { RightPanel } from '@/components/dossier/right-panel';
-import { MessageSquare, Bot, Clock } from 'lucide-react';
+import { MessageSquare, Bot, Clock, Sparkles } from 'lucide-react';
 import type { Iteration, ContextDoc, CodeFile, ProjectContext } from '@/components/dossier/types';
 
 // Sample data structure with iterations
@@ -522,15 +522,23 @@ export function JobScheduler() {
 ];
 
 export default function DossierPage() {
+  const [appMode, setAppMode] = useState<'ideation' | 'active'>('ideation');
   const [viewMode, setViewMode] = useState<'functionality' | 'architecture'>('functionality');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'building' | 'reviewing'>('idle');
+  const [userRequest, setUserRequest] = useState('');
   
   // Project context - shows users what spawned this map
   const projectContext: ProjectContext = {
-    userRequest: "Build a field service management app like Jobber - capture leads, send quotes, schedule jobs, and invoice customers",
-    generatedAt: "2 hours ago",
+    userRequest: userRequest || "Build a field service management app like Jobber - capture leads, send quotes, schedule jobs, and invoice customers",
+    generatedAt: "Just now",
     activeAgents: 3,
-    lastUpdate: "2 min ago",
+    lastUpdate: "Just now",
+  };
+  
+  const handleIdeationComplete = (request: string) => {
+    setUserRequest(request);
+    setAppMode('active');
+    setAgentStatus('building');
   };
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -633,76 +641,100 @@ export default function DossierPage() {
           project={{
             name: 'Dossier',
             description: 'Break vision into flow maps. Bundle context. Ship at AI speed.',
-            status: 'active',
+            status: appMode === 'ideation' ? 'planning' : 'active',
             collaborators: ['You', 'AI Agent'],
           }}
+          isIdeationMode={appMode === 'ideation'}
+          onIdeationComplete={handleIdeationComplete}
         />
 
-        {/* Center - Iteration Blocks (vertically stacked, each with side-scrollable story map) */}
+        {/* Center - Iteration Blocks or Empty State */}
         <div className="flex-1 flex flex-col overflow-hidden bg-background">
-          {/* Project Context Banner - Fixed at top */}
-          <div className="shrink-0 bg-secondary/80 backdrop-blur border-b border-border px-6 py-4">
-            <div className="flex items-start justify-between gap-6">
-              {/* User's original request */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">
-                  <MessageSquare className="h-3 w-3" />
-                  Your Request
+          {appMode === 'ideation' ? (
+            /* Empty state during ideation */
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center max-w-md px-6">
+                <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-secondary mb-6">
+                  <Sparkles className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <p className="text-sm text-foreground font-medium leading-relaxed">
-                  "{projectContext.userRequest}"
+                <h2 className="text-xl font-semibold text-foreground mb-3">Describe your idea</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Use the Agent chat in the left panel to describe what you want to build. 
+                  I'll ask a few questions, then generate an implementation roadmap.
                 </p>
-              </div>
-              
-              {/* Agent status */}
-              <div className="flex items-center gap-4 shrink-0">
-                <div className="flex items-center gap-2 text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <Bot className="h-3.5 w-3.5 text-green-500" />
-                    <span className="text-green-500 font-mono font-bold">{projectContext.activeAgents}</span>
-                    <span className="text-muted-foreground">agents working</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>Updated {projectContext.lastUpdate}</span>
+                <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+                  <span>Waiting for your input...</span>
                 </div>
               </div>
             </div>
-            
-            {/* Explanation */}
-            <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-              This implementation map was generated from your request. Each card represents a task agents are working on. 
-              <span className="text-foreground"> Click any card</span> to see details, provide answers, or guide the work.
-            </p>
-          </div>
+          ) : (
+            <>
+              {/* Project Context Banner - Fixed at top */}
+              <div className="shrink-0 bg-secondary/80 backdrop-blur border-b border-border px-6 py-4">
+                <div className="flex items-start justify-between gap-6">
+                  {/* User's original request */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">
+                      <MessageSquare className="h-3 w-3" />
+                      Your Request
+                    </div>
+                    <p className="text-sm text-foreground font-medium leading-relaxed">
+                      "{projectContext.userRequest}"
+                    </p>
+                  </div>
+                  
+                  {/* Agent status */}
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Bot className="h-3.5 w-3.5 text-green-500" />
+                        <span className="text-green-500 font-mono font-bold">{projectContext.activeAgents}</span>
+                        <span className="text-muted-foreground">agents working</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>Updated {projectContext.lastUpdate}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Explanation */}
+                <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                  This implementation map was generated from your request. Each card represents a task agents are working on. 
+                  <span className="text-foreground"> Click any card</span> to see details, provide answers, or guide the work.
+                </p>
+              </div>
 
-          {/* Iterations */}
-          <div className="flex-1 overflow-y-auto">
-            {iterations.map((iteration) => (
-              <IterationBlock
-                key={iteration.id}
-                iteration={iteration}
-                viewMode={viewMode}
-                expandedCardId={expandedCardId}
-                onExpandCard={setExpandedCardId}
-                onCardAction={handleCardAction}
-                onUpdateCardDescription={handleUpdateCardDescription}
-                onUpdateQuickAnswer={handleUpdateQuickAnswer}
-                onUpdateFileDescription={handleUpdateFileDescription}
-                onSelectDoc={(doc) => {
-                  setSelectedDoc(doc);
-                  setRightPanelTab('docs');
-                  setRightPanelOpen(true);
-                }}
-                onFileClick={(file) => {
-                  setSelectedFile(file);
-                  setRightPanelTab('terminal');
-                  setRightPanelOpen(true);
-                }}
-              />
-            ))}
-          </div>
+              {/* Iterations */}
+              <div className="flex-1 overflow-y-auto">
+                {iterations.map((iteration) => (
+                  <IterationBlock
+                    key={iteration.id}
+                    iteration={iteration}
+                    viewMode={viewMode}
+                    expandedCardId={expandedCardId}
+                    onExpandCard={setExpandedCardId}
+                    onCardAction={handleCardAction}
+                    onUpdateCardDescription={handleUpdateCardDescription}
+                    onUpdateQuickAnswer={handleUpdateQuickAnswer}
+                    onUpdateFileDescription={handleUpdateFileDescription}
+                    onSelectDoc={(doc) => {
+                      setSelectedDoc(doc);
+                      setRightPanelTab('docs');
+                      setRightPanelOpen(true);
+                    }}
+                    onFileClick={(file) => {
+                      setSelectedFile(file);
+                      setRightPanelTab('terminal');
+                      setRightPanelOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right Panel - Files/Terminal/Docs (Collapsible) */}
