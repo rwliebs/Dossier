@@ -5,7 +5,8 @@ import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { IterationBlock } from '@/components/dossier/iteration-block';
 import { RightPanel } from '@/components/dossier/right-panel';
-import type { Iteration, ContextDoc, CodeFile } from '@/components/dossier/types';
+import { MessageSquare, Bot, Clock } from 'lucide-react';
+import type { Iteration, ContextDoc, CodeFile, ProjectContext } from '@/components/dossier/types';
 
 // Sample data structure with iterations
 const sampleIterations: Iteration[] = [
@@ -13,99 +14,83 @@ const sampleIterations: Iteration[] = [
     id: 'iteration-1',
     phase: 'mvp',
     label: 'MVP',
-    description: 'Core dating coordination features',
+    description: 'Core lead capture, quoting, and job scheduling',
     epics: [
       {
         id: 'epic-1',
-        title: 'Showing partners when I\'m available',
+        title: 'Lead Management',
         color: 'yellow',
         activities: [
           {
             id: 'activity-1',
             epicId: 'epic-1',
-            title: 'Recording dating availability',
+            title: 'Capturing new leads',
             cards: [
               {
                 id: 'card-1',
                 activityId: 'activity-1',
-                title: 'Import a shared Google calendar',
-                description: 'Allow users to sync availability from Google Calendar',
+                title: 'Lead intake form with customer details',
+                description: 'Capture name, address, phone, service type',
                 status: 'active',
                 priority: 1,
                 contextDocs: [
                   {
                     id: 'doc-1',
-                    name: 'Google Calendar API',
+                    name: 'Lead Data Model',
                     type: 'doc',
-                    title: 'Google Calendar API Documentation',
-                    content: `# Google Calendar API v3
+                    title: 'Lead Entity Schema',
+                    content: `# Lead Data Model
 
-## Overview
-The Google Calendar API allows applications to perform read and write operations on Google Calendar data. This includes managing events, availability, and synchronization.
+## Required Fields
+- customer_name: string
+- phone: string (validated format)
+- email: string (optional)
+- address: { street, city, state, zip }
+- service_type: enum (lawn_care, plumbing, electrical, hvac, cleaning)
+- source: enum (website, phone, referral, advertisement)
 
-## Key Endpoints
-- GET /calendars/{calendarId}/events
-- POST /calendars/{calendarId}/events
-- GET /calendars/{calendarId}
+## Status Flow
+new -> contacted -> qualified -> converted | lost
 
-## Authentication
-OAuth 2.0 is required for calendar access. Scopes needed:
-- calendar.events
-- calendar.readonly
-- calendar.settings
-
-## Rate Limits
-- 1,000 requests per 100 seconds per user
-- Implement exponential backoff for retries
-
-## Sync Strategy
-Use the 'syncToken' field to efficiently sync changes:
-1. Store the syncToken from previous sync
-2. Use syncToken in next request to get only changes
-3. Handle full sync when syncToken expires`,
+## Notes
+- Leads can have multiple contact attempts logged
+- Property details captured for service estimation`,
                   },
                   {
                     id: 'doc-2',
-                    name: 'OAuth Setup',
+                    name: 'Address Validation',
                     type: 'design',
-                    title: 'OAuth 2.0 Flow Design',
-                    content: `# OAuth 2.0 Implementation
+                    title: 'Google Places Integration',
+                    content: `# Address Autocomplete
 
-## User Flow
-1. User clicks "Connect Google Calendar"
-2. Redirected to Google consent screen
-3. User authorizes access scopes
-4. Redirect back with authorization code
-5. Exchange code for access token
-6. Store refresh token securely
-
-## Implementation Details
-- Use httpOnly cookies for token storage
-- Refresh token before expiry (check remaining time)
-- Handle permission denial gracefully
-- Show clear error messages`,
+## Implementation
+- Use Google Places Autocomplete API
+- Validate service area coverage
+- Store lat/lng for routing optimization
+- Cache frequent addresses`,
                   },
                 ],
-                requirements: ['OAuth setup', 'Calendar sync', 'Token refresh'],
-                knownFacts: [{ id: 'kf-1', text: 'Using Google Calendar API v3', source: 'Tech spec' }],
-                assumptions: [{ id: 'a-1', text: 'Users have Google accounts' }],
-                questions: [{ id: 'q-1', text: 'Should we sync all calendars or let users choose?' }],
-                codeFileIds: ['file-1', 'file-2', 'file-3'],
+                requirements: ['Form validation', 'Address autocomplete', 'Phone formatting'],
+                knownFacts: [{ id: 'kf-1', text: 'Using Google Places for address validation', source: 'Tech spec' }],
+                assumptions: [{ id: 'a-1', text: 'Service area is within 50 mile radius' }],
+                questions: [{ id: 'q-1', text: 'Should we capture property size for lawn care leads?' }],
+                codeFileIds: ['file-1', 'file-2'],
+                testFileIds: ['file-6', 'file-7'],
               },
               {
                 id: 'card-2',
                 activityId: 'activity-1',
-                title: 'Link to other users as partners, show availability',
-                description: 'Share calendar view with partners',
+                title: 'Lead assignment to team members',
+                description: 'Route leads based on service type and availability',
                 status: 'questions',
                 priority: 2,
                 contextDocs: [],
-                requirements: ['User linking', 'Sharing permissions'],
+                requirements: ['Team member profiles', 'Service specializations', 'Workload balancing'],
                 knownFacts: [],
                 assumptions: [],
-                questions: [{ id: 'q-2', text: 'How do we handle partner privacy? Full calendar or just busy times?' }],
-                quickAnswer: 'Show only busy/free status, not event details. Implement with time-blocked view.',
-                codeFileIds: ['file-2', 'file-4'],
+                questions: [{ id: 'q-2', text: 'Should assignment be automatic or manual review first?' }],
+                quickAnswer: 'Start with manual assignment, add auto-assignment in V2 based on rules.',
+                codeFileIds: ['file-3'],
               },
             ],
           },
@@ -113,28 +98,70 @@ Use the 'syncToken' field to efficiently sync changes:
       },
       {
         id: 'epic-2',
-        title: 'Booking dates',
+        title: 'Quoting',
         color: 'blue',
         activities: [
           {
             id: 'activity-2',
             epicId: 'epic-2',
-            title: 'Selecting and proposing dates',
+            title: 'Creating and sending quotes',
             cards: [
               {
                 id: 'card-3',
                 activityId: 'activity-2',
-                title: 'Scheduling & booking',
-                description: 'Date picker and time slot selection',
+                title: 'Quote builder with line items',
+                description: 'Build quotes with services, materials, labor',
                 status: 'review',
+                priority: 1,
+                contextDocs: [],
+                requirements: ['Line item editor', 'Tax calculation', 'Discount support'],
+                knownFacts: [],
+                assumptions: [],
+                questions: [],
+                codeFileIds: ['file-4'],
+                testFileIds: ['file-8'],
+              },
+              {
+                id: 'card-4',
+                activityId: 'activity-2',
+                title: 'Email quote to customer',
+                description: 'Send branded PDF quote via email',
+                status: 'todo',
                 priority: 2,
                 contextDocs: [],
-                requirements: ['Date selection', 'Time slot availability'],
+                requirements: ['PDF generation', 'Email delivery', 'Acceptance link'],
                 knownFacts: [],
                 assumptions: [],
                 questions: [],
                 codeFileIds: ['file-5'],
-                testFileIds: ['file-8'],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'epic-3',
+        title: 'Scheduling',
+        color: 'green',
+        activities: [
+          {
+            id: 'activity-3',
+            epicId: 'epic-3',
+            title: 'Booking jobs',
+            cards: [
+              {
+                id: 'card-5',
+                activityId: 'activity-3',
+                title: 'Calendar view with drag-drop scheduling',
+                description: 'Visual scheduler for team assignments',
+                status: 'todo',
+                priority: 1,
+                contextDocs: [],
+                requirements: ['Week/day views', 'Drag-drop jobs', 'Team member lanes'],
+                knownFacts: [],
+                assumptions: [],
+                questions: [],
+                codeFileIds: ['file-9'],
               },
             ],
           },
@@ -144,280 +171,343 @@ Use the 'syncToken' field to efficiently sync changes:
     codeFiles: [
       { 
         id: 'file-1', 
-        path: '/app/components/Calendar.tsx', 
-        name: 'Calendar.tsx', 
+        path: '/app/components/LeadForm.tsx', 
+        name: 'LeadForm.tsx', 
         type: 'component', 
-        cardIds: ['card-1', 'card-3'], 
-        epicIds: ['epic-1', 'epic-2'],
-        description: 'Main calendar component for displaying availability',
+        cardIds: ['card-1'], 
+        epicIds: ['epic-1'],
+        description: 'Lead intake form with validation',
         code: `'use client';
 
-import { useState, useEffect } from 'react';
-import { useCalendar } from '@/hooks/useCalendar';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { AddressAutocomplete } from './AddressAutocomplete';
 
-export function Calendar() {
-  const [events, setEvents] = useState([]);
-  const { syncCalendar } = useCalendar();
+interface LeadFormData {
+  customerName: string;
+  phone: string;
+  email?: string;
+  address: string;
+  serviceType: 'lawn_care' | 'plumbing' | 'electrical' | 'hvac' | 'cleaning';
+  notes?: string;
+}
 
-  useEffect(() => {
-    syncCalendar().then(setEvents);
-  }, []);
+export function LeadForm({ onSubmit }: { onSubmit: (data: LeadFormData) => void }) {
+  const { register, handleSubmit, formState: { errors } } = useForm<LeadFormData>();
 
   return (
-    <div className="calendar-container">
-      <div className="calendar-header">
-        <h2>My Availability</h2>
-      </div>
-      <div className="calendar-grid">
-        {events.map((event) => (
-          <div key={event.id} className="event">
-            {event.title}
-          </div>
-        ))}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <input {...register('customerName', { required: true })} placeholder="Customer Name" />
+      <input {...register('phone', { required: true })} placeholder="Phone" type="tel" />
+      <AddressAutocomplete {...register('address', { required: true })} />
+      <select {...register('serviceType', { required: true })}>
+        <option value="lawn_care">Lawn Care</option>
+        <option value="plumbing">Plumbing</option>
+        <option value="electrical">Electrical</option>
+      </select>
+      <button type="submit">Create Lead</button>
+    </form>
+  );
+}`
+      },
+      { 
+        id: 'file-2', 
+        path: '/api/leads/route.ts', 
+        name: 'route.ts', 
+        type: 'api', 
+        cardIds: ['card-1'], 
+        epicIds: ['epic-1'],
+        description: 'Lead CRUD API endpoints',
+        code: `import { db } from '@/lib/db';
+import { leads } from '@/lib/schema';
+
+export async function POST(req: Request) {
+  const data = await req.json();
+  
+  const lead = await db.insert(leads).values({
+    customerName: data.customerName,
+    phone: data.phone,
+    email: data.email,
+    address: data.address,
+    serviceType: data.serviceType,
+    status: 'new',
+    createdAt: new Date(),
+  }).returning();
+
+  return Response.json({ lead: lead[0] });
+}
+
+export async function GET() {
+  const allLeads = await db.select().from(leads).orderBy(leads.createdAt);
+  return Response.json({ leads: allLeads });
+}`
+      },
+      { 
+        id: 'file-3', 
+        path: '/app/components/LeadAssignment.tsx', 
+        name: 'LeadAssignment.tsx', 
+        type: 'component', 
+        cardIds: ['card-2'], 
+        epicIds: ['epic-1'],
+        description: 'Team member assignment dropdown',
+        code: `'use client';
+
+import { useState } from 'react';
+import { useTeamMembers } from '@/hooks/useTeamMembers';
+
+export function LeadAssignment({ leadId, currentAssignee }: { leadId: string; currentAssignee?: string }) {
+  const { members } = useTeamMembers();
+  const [assignee, setAssignee] = useState(currentAssignee);
+
+  const handleAssign = async (memberId: string) => {
+    await fetch(\`/api/leads/\${leadId}/assign\`, {
+      method: 'POST',
+      body: JSON.stringify({ assigneeId: memberId }),
+    });
+    setAssignee(memberId);
+  };
+
+  return (
+    <select value={assignee} onChange={(e) => handleAssign(e.target.value)}>
+      <option value="">Unassigned</option>
+      {members.map((m) => (
+        <option key={m.id} value={m.id}>{m.name}</option>
+      ))}
+    </select>
+  );
+}`
+      },
+      { 
+        id: 'file-4', 
+        path: '/app/components/QuoteBuilder.tsx', 
+        name: 'QuoteBuilder.tsx', 
+        type: 'component', 
+        cardIds: ['card-3'], 
+        epicIds: ['epic-2'],
+        description: 'Quote line item editor',
+        code: `'use client';
+
+import { useState } from 'react';
+
+interface LineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export function QuoteBuilder({ leadId }: { leadId: string }) {
+  const [items, setItems] = useState<LineItem[]>([]);
+  const [taxRate] = useState(0.08);
+
+  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const tax = subtotal * taxRate;
+  const total = subtotal + tax;
+
+  const addItem = () => {
+    setItems([...items, { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 }]);
+  };
+
+  return (
+    <div className="quote-builder">
+      <h2>Quote for Lead #{leadId}</h2>
+      {items.map((item) => (
+        <div key={item.id} className="line-item">
+          <input placeholder="Description" />
+          <input type="number" placeholder="Qty" />
+          <input type="number" placeholder="Price" />
+        </div>
+      ))}
+      <button onClick={addItem}>Add Line Item</button>
+      <div className="totals">
+        <p>Subtotal: \${subtotal.toFixed(2)}</p>
+        <p>Tax: \${tax.toFixed(2)}</p>
+        <p>Total: \${total.toFixed(2)}</p>
       </div>
     </div>
   );
 }`
       },
       { 
-        id: 'file-2', 
-        path: '/api/calendar/sync.ts', 
-        name: 'sync.ts', 
+        id: 'file-5', 
+        path: '/api/quotes/send/route.ts', 
+        name: 'route.ts', 
         type: 'api', 
-        cardIds: ['card-1', 'card-2'], 
-        epicIds: ['epic-1'],
-        description: 'API endpoint for syncing calendar data',
-        code: `import { getServerSession } from 'next-auth/next';
-import { fetchCalendarEvents } from '@/lib/services/google-calendar';
+        cardIds: ['card-4'], 
+        epicIds: ['epic-2'],
+        description: 'Quote email delivery endpoint',
+        code: `import { generateQuotePDF } from '@/lib/pdf';
+import { sendEmail } from '@/lib/email';
 
 export async function POST(req: Request) {
-  try {
-    const session = await getServerSession();
-    if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { calendarId } = await req.json();
-    const events = await fetchCalendarEvents(session.accessToken, calendarId);
-
-    return Response.json({ success: true, events });
-  } catch (error) {
-    console.error('Sync failed:', error);
-    return Response.json({ error: 'Sync failed' }, { status: 500 });
-  }
-}`
-      },
-      { 
-        id: 'file-3', 
-        path: '/lib/services/google-calendar.ts', 
-        name: 'google-calendar.ts', 
-        type: 'service', 
-        cardIds: ['card-1'], 
-        epicIds: ['epic-1'],
-        description: 'Google Calendar API integration service',
-        code: `import { google } from 'googleapis';
-
-export async function fetchCalendarEvents(accessToken: string, calendarId: string) {
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: accessToken });
-
-  const calendar = google.calendar({ version: 'v3', auth });
-  const response = await calendar.events.list({
-    calendarId,
-    timeMin: new Date().toISOString(),
-    maxResults: 100,
-    singleEvents: true,
-    orderBy: 'startTime',
+  const { quoteId, recipientEmail } = await req.json();
+  
+  // Generate PDF
+  const pdfBuffer = await generateQuotePDF(quoteId);
+  
+  // Send email with PDF attachment
+  await sendEmail({
+    to: recipientEmail,
+    subject: 'Your Quote from ServicePro',
+    template: 'quote',
+    attachments: [{ filename: 'quote.pdf', content: pdfBuffer }],
   });
 
-  return response.data.items || [];
-}`
-      },
-      { 
-        id: 'file-4', 
-        path: '/app/hooks/usePartners.ts', 
-        name: 'usePartners.ts', 
-        type: 'hook', 
-        cardIds: ['card-2'], 
-        epicIds: ['epic-1'],
-        description: 'Hook for managing partner availability state',
-        code: `import { useState, useCallback } from 'react';
-import { useSharedCalendar } from '@/context/SharedCalendarContext';
-
-export function usePartners() {
-  const [partners, setPartners] = useState([]);
-  const { sharedCalendar } = useSharedCalendar();
-
-  const addPartner = useCallback((email: string) => {
-    // Request partner's availability
-    return fetch('/api/partners/add', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  }, []);
-
-  return { partners, addPartner };
-}`
-      },
-      { 
-        id: 'file-5', 
-        path: '/app/components/DatePicker.tsx', 
-        name: 'DatePicker.tsx', 
-        type: 'component', 
-        cardIds: ['card-3'], 
-        epicIds: ['epic-2'],
-        description: 'Date picker component for scheduling',
-        code: `'use client';
-
-import { useState } from 'react';
-import { Calendar as CalendarIcon } from 'lucide-react';
-
-interface DatePickerProps {
-  onDateSelect: (date: Date) => void;
-}
-
-export function DatePicker({ onDateSelect }: DatePickerProps) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <button onClick={() => setOpen(!open)}>
-      <CalendarIcon className="w-4 h-4" />
-      Select Date
-    </button>
-  );
+  return Response.json({ success: true });
 }`
       },
       { 
         id: 'file-6', 
-        path: '/tests/calendar.test.ts', 
-        name: 'calendar.test.ts', 
+        path: '/tests/lead-form.test.ts', 
+        name: 'lead-form.test.ts', 
         type: 'util', 
         cardIds: ['card-1'], 
         epicIds: ['epic-1'],
-        description: 'Calendar component unit tests',
-        code: `import { render, screen } from '@testing-library/react';
-import { Calendar } from '@/app/components/Calendar';
+        description: 'Lead form validation tests',
+        code: `import { render, screen, fireEvent } from '@testing-library/react';
+import { LeadForm } from '@/app/components/LeadForm';
 
-describe('Calendar', () => {
-  it('renders calendar container', () => {
-    render(<Calendar />);
-    expect(screen.getByText('My Availability')).toBeInTheDocument();
+describe('LeadForm', () => {
+  it('validates required fields', async () => {
+    render(<LeadForm onSubmit={jest.fn()} />);
+    fireEvent.click(screen.getByText('Create Lead'));
+    expect(await screen.findByText('Customer name is required')).toBeInTheDocument();
   });
 
-  it('displays events', () => {
-    render(<Calendar />);
-    // Mock events would be displayed
-    expect(screen.queryByTestId('calendar-grid')).toBeInTheDocument();
-  });
-
-  it('syncs calendar on mount', async () => {
-    render(<Calendar />);
-    // Verify sync was called
-    await screen.findByText('Synced');
+  it('formats phone number correctly', () => {
+    render(<LeadForm onSubmit={jest.fn()} />);
+    const phoneInput = screen.getByPlaceholder('Phone');
+    fireEvent.change(phoneInput, { target: { value: '5551234567' } });
+    expect(phoneInput).toHaveValue('(555) 123-4567');
   });
 });`
       },
       { 
         id: 'file-7', 
-        path: '/tests/calendar.integration.test.ts', 
-        name: 'calendar.integration.test.ts', 
+        path: '/tests/lead-api.test.ts', 
+        name: 'lead-api.test.ts', 
         type: 'util', 
         cardIds: ['card-1'], 
         epicIds: ['epic-1'],
-        description: 'Calendar integration tests with API',
-        code: `import { render, screen, waitFor } from '@testing-library/react';
-import { Calendar } from '@/app/components/Calendar';
+        description: 'Lead API integration tests',
+        code: `import { POST, GET } from '@/api/leads/route';
 
-describe('Calendar Integration', () => {
-  it('fetches and displays events from API', async () => {
-    render(<Calendar />);
-    
-    await waitFor(() => {
-      expect(screen.getByText('Team Meeting')).toBeInTheDocument();
+describe('Leads API', () => {
+  it('creates a new lead', async () => {
+    const req = new Request('http://localhost/api/leads', {
+      method: 'POST',
+      body: JSON.stringify({ customerName: 'John Doe', phone: '555-1234' }),
     });
+    const res = await POST(req);
+    const data = await res.json();
+    expect(data.lead.customerName).toBe('John Doe');
   });
 
-  it('handles sync errors gracefully', async () => {
-    render(<Calendar />);
-    
-    await waitFor(() => {
-      expect(screen.getByText('Sync failed')).toBeInTheDocument();
-    });
+  it('returns all leads', async () => {
+    const res = await GET();
+    const data = await res.json();
+    expect(Array.isArray(data.leads)).toBe(true);
   });
 });`
       },
       { 
         id: 'file-8', 
-        path: '/tests/date-picker.test.ts', 
-        name: 'date-picker.test.ts', 
+        path: '/tests/quote-builder.test.ts', 
+        name: 'quote-builder.test.ts', 
         type: 'util', 
         cardIds: ['card-3'], 
         epicIds: ['epic-2'],
-        description: 'Date picker unit and integration tests',
+        description: 'Quote builder calculation tests',
         code: `import { render, screen, fireEvent } from '@testing-library/react';
-import { DatePicker } from '@/app/components/DatePicker';
+import { QuoteBuilder } from '@/app/components/QuoteBuilder';
 
-describe('DatePicker', () => {
-  it('renders date picker button', () => {
-    render(<DatePicker onDateSelect={jest.fn()} />);
-    expect(screen.getByRole('button')).toBeInTheDocument();
-  });
-
-  it('calls onDateSelect when date is selected', () => {
-    const onDateSelect = jest.fn();
-    render(<DatePicker onDateSelect={onDateSelect} />);
-    
-    fireEvent.click(screen.getByRole('button'));
-    expect(onDateSelect).toHaveBeenCalled();
-  });
-
-  it('selects valid dates only', () => {
-    const onDateSelect = jest.fn();
-    render(<DatePicker onDateSelect={onDateSelect} />);
-    
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 1);
-    
-    // Should accept future dates
-    expect(onDateSelect).toHaveBeenCalledWith(expect.any(Date));
+describe('QuoteBuilder', () => {
+  it('calculates totals correctly', () => {
+    render(<QuoteBuilder leadId="123" />);
+    fireEvent.click(screen.getByText('Add Line Item'));
+    // Add item with qty=2, price=100
+    expect(screen.getByText('Subtotal: $200.00')).toBeInTheDocument();
+    expect(screen.getByText('Tax: $16.00')).toBeInTheDocument();
+    expect(screen.getByText('Total: $216.00')).toBeInTheDocument();
   });
 });`
       },
+      { 
+        id: 'file-9', 
+        path: '/app/components/JobScheduler.tsx', 
+        name: 'JobScheduler.tsx', 
+        type: 'component', 
+        cardIds: ['card-5'], 
+        epicIds: ['epic-3'],
+        description: 'Drag-drop job scheduling calendar',
+        code: `'use client';
+
+import { useState } from 'react';
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
+
+export function JobScheduler() {
+  const [jobs, setJobs] = useState([]);
+  const [view, setView] = useState<'week' | 'day'>('week');
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over) {
+      // Update job time slot
+      console.log('Move job', active.id, 'to', over.id);
+    }
+  };
+
+  return (
+    <DndContext onDragEnd={handleDragEnd}>
+      <div className="scheduler">
+        <div className="view-toggle">
+          <button onClick={() => setView('week')}>Week</button>
+          <button onClick={() => setView('day')}>Day</button>
+        </div>
+        <div className="calendar-grid">
+          {/* Time slots and job cards */}
+        </div>
+      </div>
+    </DndContext>
+  );
+}`
+      },
     ],
     dataFlows: [
-      { id: 'flow-1', fromFileId: 'file-1', toFileId: 'file-2', direction: 'output', label: 'sync request' },
-      { id: 'flow-2', fromFileId: 'file-2', toFileId: 'file-3', direction: 'output', label: 'oauth call' },
-      { id: 'flow-3', fromFileId: 'file-2', toFileId: 'file-1', direction: 'input', label: 'calendar data' },
-      { id: 'flow-4', fromFileId: 'file-4', toFileId: 'file-1', direction: 'bidirectional', label: 'partner state' },
+      { id: 'flow-1', fromFileId: 'file-1', toFileId: 'file-2', direction: 'output', label: 'create lead' },
+      { id: 'flow-2', fromFileId: 'file-3', toFileId: 'file-2', direction: 'output', label: 'assign lead' },
+      { id: 'flow-3', fromFileId: 'file-4', toFileId: 'file-5', direction: 'output', label: 'send quote' },
     ],
   },
   {
     id: 'iteration-2',
     phase: 'v2',
     label: 'V2',
-    description: 'Advanced scheduling and group coordination',
+    description: 'Invoicing and payment collection',
     epics: [
       {
-        id: 'epic-3',
-        title: 'Group availability',
+        id: 'epic-4',
+        title: 'Billing',
         color: 'purple',
         activities: [
           {
-            id: 'activity-3',
-            epicId: 'epic-3',
-            title: 'Coordinating with multiple partners',
+            id: 'activity-4',
+            epicId: 'epic-4',
+            title: 'Invoicing completed work',
             cards: [
               {
-                id: 'card-4',
-                activityId: 'activity-3',
-                title: 'Multi-person calendar sync',
-                description: 'Handle availability for groups',
+                id: 'card-6',
+                activityId: 'activity-4',
+                title: 'Invoice generation from jobs',
+                description: 'Convert completed jobs to invoices',
                 status: 'todo',
                 priority: 1,
                 contextDocs: [],
-                requirements: ['Group calendar management', 'Conflict resolution'],
+                requirements: ['Job-to-invoice conversion', 'Payment terms', 'Due dates'],
                 knownFacts: [],
-                assumptions: [{ id: 'a-2', text: 'V2 will focus on group coordination' }],
+                assumptions: [{ id: 'a-2', text: 'Invoices generated after job completion' }],
                 questions: [],
-                codeFileIds: ['file-6'],
+                codeFileIds: ['file-10'],
               },
             ],
           },
@@ -425,7 +515,7 @@ describe('DatePicker', () => {
       },
     ],
     codeFiles: [
-      { id: 'file-6', path: '/api/groups/availability.ts', name: 'availability.ts', type: 'api', cardIds: ['card-4'], epicIds: ['epic-3'] },
+      { id: 'file-10', path: '/api/invoices/route.ts', name: 'route.ts', type: 'api', cardIds: ['card-6'], epicIds: ['epic-4'] },
     ],
     dataFlows: [],
   },
@@ -434,6 +524,14 @@ describe('DatePicker', () => {
 export default function DossierPage() {
   const [viewMode, setViewMode] = useState<'functionality' | 'architecture'>('functionality');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'building' | 'reviewing'>('idle');
+  
+  // Project context - shows users what spawned this map
+  const projectContext: ProjectContext = {
+    userRequest: "Build a field service management app like Jobber - capture leads, send quotes, schedule jobs, and invoice customers",
+    generatedAt: "2 hours ago",
+    activeAgents: 3,
+    lastUpdate: "2 min ago",
+  };
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'files' | 'terminal' | 'docs'>('files');
@@ -541,30 +639,70 @@ export default function DossierPage() {
         />
 
         {/* Center - Iteration Blocks (vertically stacked, each with side-scrollable story map) */}
-        <div className="flex-1 overflow-y-auto bg-background">
-          {iterations.map((iteration) => (
-            <IterationBlock
-              key={iteration.id}
-              iteration={iteration}
-              viewMode={viewMode}
-              expandedCardId={expandedCardId}
-              onExpandCard={setExpandedCardId}
-              onCardAction={handleCardAction}
-              onUpdateCardDescription={handleUpdateCardDescription}
-              onUpdateQuickAnswer={handleUpdateQuickAnswer}
-              onUpdateFileDescription={handleUpdateFileDescription}
-              onSelectDoc={(doc) => {
-                setSelectedDoc(doc);
-                setRightPanelTab('docs');
-                setRightPanelOpen(true);
-              }}
-              onFileClick={(file) => {
-                setSelectedFile(file);
-                setRightPanelTab('terminal');
-                setRightPanelOpen(true);
-              }}
-            />
-          ))}
+        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+          {/* Project Context Banner - Fixed at top */}
+          <div className="shrink-0 bg-secondary/80 backdrop-blur border-b border-border px-6 py-4">
+            <div className="flex items-start justify-between gap-6">
+              {/* User's original request */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">
+                  <MessageSquare className="h-3 w-3" />
+                  Your Request
+                </div>
+                <p className="text-sm text-foreground font-medium leading-relaxed">
+                  "{projectContext.userRequest}"
+                </p>
+              </div>
+              
+              {/* Agent status */}
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <Bot className="h-3.5 w-3.5 text-green-500" />
+                    <span className="text-green-500 font-mono font-bold">{projectContext.activeAgents}</span>
+                    <span className="text-muted-foreground">agents working</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>Updated {projectContext.lastUpdate}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Explanation */}
+            <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+              This implementation map was generated from your request. Each card represents a task agents are working on. 
+              <span className="text-foreground"> Click any card</span> to see details, provide answers, or guide the work.
+            </p>
+          </div>
+
+          {/* Iterations */}
+          <div className="flex-1 overflow-y-auto">
+            {iterations.map((iteration) => (
+              <IterationBlock
+                key={iteration.id}
+                iteration={iteration}
+                viewMode={viewMode}
+                expandedCardId={expandedCardId}
+                onExpandCard={setExpandedCardId}
+                onCardAction={handleCardAction}
+                onUpdateCardDescription={handleUpdateCardDescription}
+                onUpdateQuickAnswer={handleUpdateQuickAnswer}
+                onUpdateFileDescription={handleUpdateFileDescription}
+                onSelectDoc={(doc) => {
+                  setSelectedDoc(doc);
+                  setRightPanelTab('docs');
+                  setRightPanelOpen(true);
+                }}
+                onFileClick={(file) => {
+                  setSelectedFile(file);
+                  setRightPanelTab('terminal');
+                  setRightPanelOpen(true);
+                }}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Right Panel - Files/Terminal/Docs (Collapsible) */}

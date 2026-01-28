@@ -5,6 +5,14 @@ export type IterationPhase = 'mvp' | 'v2' | 'v3' | 'later';
 export type FileType = 'component' | 'api' | 'service' | 'hook' | 'util' | 'schema' | 'middleware';
 export type DataFlowDirection = 'input' | 'output' | 'bidirectional';
 
+// Project context - shows user what spawned this map
+export interface ProjectContext {
+  userRequest: string; // The original feature request from user
+  generatedAt: string; // When this map was created
+  activeAgents: number; // How many agents are currently working
+  lastUpdate: string; // Last time an agent made progress
+}
+
 export interface ContextDoc {
   id: string;
   name: string;

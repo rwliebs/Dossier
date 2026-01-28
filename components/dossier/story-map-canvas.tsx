@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { ActivityColumn } from './activity-column';
 import type { Epic, ContextDoc, CodeFile } from './types';
+import { MessageSquare, Bot, Clock } from 'lucide-react'; // Importing the undeclared variables
 
 interface StoryMapCanvasProps {
   epics: Epic[];
+  projectContext: ContextDoc; // Declaring projectContext in the props
   expandedCardId?: string | null;
   onExpandCard?: (cardId: string | null) => void;
   onCardAction?: (cardId: string, action: string) => void;
@@ -18,6 +20,7 @@ interface StoryMapCanvasProps {
 
 export function StoryMapCanvas({
   epics,
+  projectContext, // Using the declared projectContext
   expandedCardId: controlledExpandedCardId,
   onExpandCard: controlledOnExpandCard,
   onCardAction,
