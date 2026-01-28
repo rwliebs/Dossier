@@ -3,7 +3,7 @@
 import React from "react"
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles, Github, Check, FolderGit2, FileCode, ChevronRight, Plus, X } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -39,6 +39,18 @@ const initialQuestions: ClarifyingQuestion[] = [
   },
 ];
 
+// Mock GitHub repo data
+const mockRepoFiles = [
+  { path: 'src/components/Dashboard.tsx', type: 'component' },
+  { path: 'src/components/CustomerList.tsx', type: 'component' },
+  { path: 'src/api/customers.ts', type: 'api' },
+  { path: 'src/api/invoices.ts', type: 'api' },
+  { path: 'src/hooks/useCustomers.ts', type: 'hook' },
+  { path: 'src/lib/db.ts', type: 'util' },
+  { path: 'src/types/customer.ts', type: 'schema' },
+  { path: 'prisma/schema.prisma', type: 'schema' },
+];
+
 export function IdeationView({ onComplete }: IdeationViewProps) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -46,7 +58,21 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userIdea, setUserIdea] = useState('');
   const [phase, setPhase] = useState<'input' | 'questions' | 'generating'>('input');
+  const [selectedContextFiles, setSelectedContextFiles] = useState<string[]>([]);
+  const [showFilePicker, setShowFilePicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Mock GitHub connection status
+  const githubConnected = true;
+  const repoName = 'acme/servicepro-app';
+
+  const toggleContextFile = (path: string) => {
+    setSelectedContextFiles(prev => 
+      prev.includes(path) 
+        ? prev.filter(p => p !== path)
+        : [...prev, path]
+    );
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -151,22 +177,113 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
     <div className="flex-1 flex flex-col bg-background">
       {/* Header */}
       <div className="border-b border-border px-8 py-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-primary" />
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <h1 className="text-lg font-semibold text-foreground">New Project</h1>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Describe your product idea and I'll help you create an implementation roadmap.
+              </p>
             </div>
-            <h1 className="text-lg font-semibold text-foreground">New Project</h1>
+            
+            {/* GitHub Connection Status */}
+            {githubConnected && (
+              <div className="shrink-0">
+                <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg border border-border">
+                  <Github className="h-4 w-4 text-foreground" />
+                  <span className="text-sm font-medium text-foreground">{repoName}</span>
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                </div>
+              </div>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground">
-            Describe your product idea and I'll help you create an implementation roadmap.
-          </p>
+          
+          {/* Context Files Section */}
+          {githubConnected && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <FolderGit2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Project Context</span>
+                  <span className="text-xs text-muted-foreground">(optional)</span>
+                </div>
+                <button
+                  onClick={() => setShowFilePicker(!showFilePicker)}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add files for context
+                </button>
+              </div>
+              
+              {/* Selected Context Files */}
+              {selectedContextFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {selectedContextFiles.map((path) => (
+                    <div
+                      key={path}
+                      className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
+                    >
+                      <FileCode className="h-3 w-3" />
+                      <span>{path.split('/').pop()}</span>
+                      <button
+                        onClick={() => toggleContextFile(path)}
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {selectedContextFiles.length === 0 && !showFilePicker && (
+                <p className="text-xs text-muted-foreground">
+                  Adding existing files helps the agent understand your codebase when planning new features.
+                </p>
+              )}
+              
+              {/* File Picker */}
+              {showFilePicker && (
+                <div className="bg-background border border-border rounded-lg p-3 max-h-48 overflow-y-auto">
+                  <div className="space-y-1">
+                    {mockRepoFiles.map((file) => (
+                      <button
+                        key={file.path}
+                        onClick={() => toggleContextFile(file.path)}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-secondary transition-colors ${
+                          selectedContextFiles.includes(file.path) ? 'bg-primary/10 text-primary' : 'text-foreground'
+                        }`}
+                      >
+                        <FileCode className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate text-left">{file.path}</span>
+                        {selectedContextFiles.includes(file.path) && (
+                          <Check className="h-3 w-3 ml-auto shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setShowFilePicker(false)}
+                    className="mt-2 w-full py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-3xl mx-auto space-y-6">
           {messages.length === 0 && (
             <div className="text-center py-12">
               <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-secondary mb-4">
@@ -249,7 +366,7 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
       {/* Quick Answer Options */}
       {currentQuestion?.options && phase === 'questions' && !isThinking && (
         <div className="px-8 pb-2">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             <div className="flex flex-wrap gap-2">
               {currentQuestion.options.map((option) => (
                 <button
@@ -268,7 +385,7 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
       {/* Input Area */}
       {phase !== 'generating' && (
         <div className="border-t border-border px-8 py-4">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             <div className="flex gap-3">
               <input
                 type="text"
