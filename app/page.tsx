@@ -5,7 +5,7 @@ import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { IterationBlock } from '@/components/dossier/iteration-block';
 import { RightPanel } from '@/components/dossier/right-panel';
-import { MessageSquare, Bot, Clock, Sparkles } from 'lucide-react';
+import { MessageSquare, Bot, Clock, Sparkles, Send } from 'lucide-react';
 import type { Iteration, ContextDoc, CodeFile, ProjectContext } from '@/components/dossier/types';
 
 // Sample data structure with iterations
@@ -656,20 +656,53 @@ export default function DossierPage() {
         <div className="flex-1 flex flex-col overflow-hidden bg-background">
           {appMode === 'ideation' ? (
             /* Empty state during ideation */
-            <div className="flex-1 flex items-center justify-center p-4">
+            <div className="flex-1 flex flex-col items-center justify-center p-4">
               <div className="text-center max-w-md px-4 md:px-6">
                 <div className="inline-flex items-center justify-center h-12 w-12 md:h-16 md:w-16 rounded-full bg-secondary mb-4 md:mb-6">
                   <Sparkles className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
                 </div>
                 <h2 className="text-lg md:text-xl font-semibold text-foreground mb-2 md:mb-3">Describe your idea</h2>
                 <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
-                  <span className="md:hidden">Tap the menu to open the Agent chat and describe what you want to build.</span>
                   <span className="hidden md:inline">Use the Agent chat in the left panel to describe what you want to build. I'll ask a few questions, then generate an implementation roadmap.</span>
+                  <span className="md:hidden">What would you like to build?</span>
                 </p>
-                <div className="mt-4 md:mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
-                  <span>Waiting for your input...</span>
-                </div>
+              </div>
+              
+              {/* Mobile chat input */}
+              <div className="md:hidden w-full max-w-md px-4 mt-6">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const form = e.target as HTMLFormElement;
+                    const input = form.elements.namedItem('mobileIdea') as HTMLInputElement;
+                    if (input.value.trim()) {
+                      handleIdeationComplete(input.value.trim());
+                    }
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="text"
+                    name="mobileIdea"
+                    placeholder="e.g. A field service management app..."
+                    className="flex-1 px-4 py-3 text-sm bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    <Send className="h-5 w-5" />
+                  </button>
+                </form>
+                <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                  Press send to generate your implementation roadmap
+                </p>
+              </div>
+              
+              {/* Desktop waiting indicator */}
+              <div className="hidden md:flex mt-6 items-center justify-center gap-2 text-xs text-muted-foreground">
+                <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+                <span>Waiting for your input...</span>
               </div>
             </div>
           ) : (
