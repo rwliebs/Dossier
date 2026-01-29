@@ -541,6 +541,7 @@ export default function DossierPage() {
     setAgentStatus('building');
   };
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'files' | 'terminal' | 'docs'>('files');
   const [selectedDoc, setSelectedDoc] = useState<ContextDoc | null>(null);
@@ -629,7 +630,8 @@ export default function DossierPage() {
       <Header 
         viewMode={viewMode} 
         onViewModeChange={setViewMode} 
-        agentStatus={agentStatus} 
+        agentStatus={agentStatus}
+        onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
       />
 
       {/* Main Layout */}
@@ -646,23 +648,25 @@ export default function DossierPage() {
           }}
           isIdeationMode={appMode === 'ideation'}
           onIdeationComplete={handleIdeationComplete}
+          isMobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
         />
 
         {/* Center - Iteration Blocks or Empty State */}
         <div className="flex-1 flex flex-col overflow-hidden bg-background">
           {appMode === 'ideation' ? (
             /* Empty state during ideation */
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center max-w-md px-6">
-                <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-secondary mb-6">
-                  <Sparkles className="h-8 w-8 text-muted-foreground" />
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="text-center max-w-md px-4 md:px-6">
+                <div className="inline-flex items-center justify-center h-12 w-12 md:h-16 md:w-16 rounded-full bg-secondary mb-4 md:mb-6">
+                  <Sparkles className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-3">Describe your idea</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Use the Agent chat in the left panel to describe what you want to build. 
-                  I'll ask a few questions, then generate an implementation roadmap.
+                <h2 className="text-lg md:text-xl font-semibold text-foreground mb-2 md:mb-3">Describe your idea</h2>
+                <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+                  <span className="md:hidden">Tap the menu to open the Agent chat and describe what you want to build.</span>
+                  <span className="hidden md:inline">Use the Agent chat in the left panel to describe what you want to build. I'll ask a few questions, then generate an implementation roadmap.</span>
                 </p>
-                <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <div className="mt-4 md:mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                   <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
                   <span>Waiting for your input...</span>
                 </div>
@@ -671,37 +675,37 @@ export default function DossierPage() {
           ) : (
             <>
               {/* Project Context Banner - Fixed at top */}
-              <div className="shrink-0 bg-secondary/80 backdrop-blur border-b border-border px-6 py-4">
-                <div className="flex items-start justify-between gap-6">
+              <div className="shrink-0 bg-secondary/80 backdrop-blur border-b border-border px-4 md:px-6 py-3 md:py-4">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 md:gap-6">
                   {/* User's original request */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">
                       <MessageSquare className="h-3 w-3" />
                       Your Request
                     </div>
-                    <p className="text-sm text-foreground font-medium leading-relaxed">
+                    <p className="text-xs md:text-sm text-foreground font-medium leading-relaxed line-clamp-2 md:line-clamp-none">
                       "{projectContext.userRequest}"
                     </p>
                   </div>
                   
                   {/* Agent status */}
-                  <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex items-center gap-3 md:gap-4 shrink-0">
                     <div className="flex items-center gap-2 text-xs">
                       <div className="flex items-center gap-1.5">
                         <Bot className="h-3.5 w-3.5 text-green-500" />
                         <span className="text-green-500 font-mono font-bold">{projectContext.activeAgents}</span>
-                        <span className="text-muted-foreground">agents working</span>
+                        <span className="hidden sm:inline text-muted-foreground">agents working</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      <span>Updated {projectContext.lastUpdate}</span>
+                      <span className="hidden sm:inline">Updated</span> {projectContext.lastUpdate}
                     </div>
                   </div>
                 </div>
                 
-                {/* Explanation */}
-                <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                {/* Explanation - hidden on mobile */}
+                <p className="hidden md:block text-[11px] text-muted-foreground mt-3 leading-relaxed">
                   This implementation map was generated from your request. Each card represents a task agents are working on. 
                   <span className="text-foreground"> Click any card</span> to see details, provide answers, or guide the work.
                 </p>
@@ -737,16 +741,18 @@ export default function DossierPage() {
           )}
         </div>
 
-        {/* Right Panel - Files/Terminal/Docs (Collapsible) */}
+        {/* Right Panel - Files/Terminal/Docs (Collapsible, hidden on mobile) */}
         {rightPanelOpen && (
-        <RightPanel
-          isOpen={rightPanelOpen}
-          onClose={() => setRightPanelOpen(false)}
-          activeDoc={selectedDoc}
-          activeFile={selectedFile}
-          activeTab={rightPanelTab}
-          onTabChange={setRightPanelTab}
-        />
+        <div className="hidden lg:block">
+          <RightPanel
+            isOpen={rightPanelOpen}
+            onClose={() => setRightPanelOpen(false)}
+            activeDoc={selectedDoc}
+            activeFile={selectedFile}
+            activeTab={rightPanelTab}
+            onTabChange={setRightPanelTab}
+          />
+        </div>
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronUp, BookOpen, Bot, User, Send, Loader2, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Tag } from 'lucide-react';
+import { ChevronDown, ChevronUp, BookOpen, Bot, User, Send, Loader2, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Tag, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ProjectInfo {
@@ -37,6 +37,9 @@ interface LeftSidebarProps {
   // Ideation/chat props
   isIdeationMode?: boolean;
   onIdeationComplete?: (request: string) => void;
+  // Mobile props
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 const initialQuestions: ClarifyingQuestion[] = [
@@ -86,7 +89,7 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
-export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = false, onIdeationComplete }: LeftSidebarProps) {
+export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = false, onIdeationComplete, isMobileOpen = false, onMobileClose }: LeftSidebarProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['overview', 'chat', 'github'])
   );
@@ -180,9 +183,9 @@ export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = f
     completed: 'bg-gray-700 text-gray-50',
   };
 
-  if (isCollapsed) {
+  if (isCollapsed && !isMobileOpen) {
     return (
-      <div className="w-12 border-r border-grid-line bg-background flex flex-col items-center py-4 gap-4">
+      <div className="hidden md:flex w-12 border-r border-grid-line bg-background flex-col items-center py-4 gap-4">
         <Button
           variant="ghost"
           size="sm"
@@ -197,8 +200,9 @@ export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = f
 
   const schemas = ['User Schema', 'Product Schema', 'Event Schema'];
 
-  return (
-    <div className="w-64 border-r border-grid-line bg-background overflow-y-auto flex flex-col">
+  // Mobile overlay
+  const sidebarContent = (
+    <div className="w-72 md:w-64 border-r border-grid-line bg-background overflow-y-auto flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-grid-line">
         <div className="flex items-start justify-between gap-2 mb-3">
@@ -210,11 +214,21 @@ export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = f
               {project.status}
             </span>
           </div>
+          {/* Close button for mobile */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onMobileClose}
+            className="md:hidden h-8 w-8 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+          {/* Collapse button for desktop */}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onToggle(true)}
-            className="h-6 w-6 p-0"
+            className="hidden md:flex h-6 w-6 p-0"
           >
             <ChevronUp className="h-3 w-3" />
           </Button>
@@ -401,5 +415,29 @@ export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = f
         )}
       </div>
     </div>
+  );
+
+  // Desktop: regular sidebar
+  // Mobile: overlay when isMobileOpen is true
+  return (
+    <>
+      {/* Mobile overlay backdrop */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onMobileClose}
+        />
+      )}
+      
+      {/* Desktop sidebar */}
+      <div className="hidden md:block">
+        {sidebarContent}
+      </div>
+      
+      {/* Mobile sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-50 md:hidden transform transition-transform duration-300 ease-in-out ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {sidebarContent}
+      </div>
+    </>
   );
 }
