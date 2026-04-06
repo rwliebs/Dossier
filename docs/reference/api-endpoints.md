@@ -4,8 +4,10 @@ REST API for the Dossier planning and build system. All routes under `/api`. SQL
 
 ## Setup
 
-1. Copy `.env.example` to `.env.local` and set `ANTHROPIC_API_KEY` and `GITHUB_TOKEN`.
-2. Database: SQLite (default) stores data in `~/.dossier/dossier.db`. Migrations run automatically on first use.
+1. Copy `.env.example` to `.env.local`.
+2. Anthropic credential: set `ANTHROPIC_API_KEY` **or** rely on installed Claude CLI settings.
+3. GitHub credential: use Connect GitHub OAuth (`GITHUB_OAUTH_CLIENT_ID`) or set `GITHUB_TOKEN`.
+4. Database: SQLite (default) stores data in `~/.dossier/dossier.db`. Migrations run automatically on first use.
 
 ## Base URL
 
@@ -76,6 +78,139 @@ Update project.
 **Request body:** Same as POST, all fields optional
 
 **Response:** `200` — Updated project object
+
+---
+
+## Setup & GitHub Integration
+
+### GET /api/setup/status
+
+Returns whether setup is incomplete and which keys are still required.
+
+**Response:** `200`
+```json
+{
+  "needsSetup": true,
+  "missingKeys": ["ANTHROPIC_API_KEY", "GITHUB_TOKEN"],
+  "configPath": "/home/<user>/.dossier/config",
+  "anthropicViaCli": false
+}
+```
+
+Notes:
+- Anthropic is considered configured when a key is found in env/config **or** Claude CLI credentials are available.
+- GitHub is considered configured when `resolveGitHubToken()` succeeds.
+
+### POST /api/setup
+
+Save API credentials to local config (`~/.dossier/config`) and inject into process env for immediate use.
+
+**Request body:**
+```json
+{
+  "anthropicApiKey": "sk-ant-...",
+  "githubToken": "ghp_..."
+}
+```
+
+Constraints:
+- At least one of `anthropicApiKey` or `githubToken` must be non-empty.
+- If `githubToken` is provided, `DOSSIER_GITHUB_IGNORE_ENV` is cleared so the new token is used.
+
+**Responses:**
+- `200` `{ "success": true, "configPath": "..." }`
+- `400` `{ "success": false, "error": "At least one key is required" }`
+
+### GET /api/github/oauth/meta
+
+Returns whether GitHub OAuth is configured server-side.
+
+**Response:** `200`
+```json
+{ "oauthConfigured": true }
+```
+
+### GET /api/github/oauth/start
+
+Starts GitHub OAuth authorization-code + PKCE flow and redirects to GitHub.
+
+**Query params:**
+- `return_to` (optional): same-origin path to return to (`/setup`, `/`, etc.)
+- `port` (optional): loopback callback port override (used for Electron/CLI loopback flows)
+
+Behavior:
+- Sets short-lived HttpOnly cookies for OAuth state/verifier/return path.
+- Redirects to `https://github.com/login/oauth/authorize` with `scope=repo`.
+
+**Errors:**
+- `503` when `GITHUB_OAUTH_CLIENT_ID` is not configured.
+
+### GET /api/github/oauth/callback
+
+Handles OAuth callback, exchanges code for token, persists `GITHUB_TOKEN`, then redirects back.
+
+**Success redirect query:**
+- `github_oauth=success`
+
+**Error redirect query (`github_error`):**
+- `access_denied` - user canceled auth
+- `invalid_state` - missing/mismatched state/verifier cookie
+- `misconfigured` - OAuth client id missing
+- `server` - token exchange or config write failed
+
+### DELETE /api/github/auth (also supports POST)
+
+Disconnect GitHub by removing stored `GITHUB_TOKEN` and setting `DOSSIER_GITHUB_IGNORE_ENV=1` in config.
+
+Why this matters: if `.env.local` still has `GITHUB_TOKEN`, disconnect still behaves as disconnected until reconnect/save.
+
+### GET /api/github/user
+
+Returns the current GitHub login for the resolved token.
+
+**Responses:**
+- `200` `{ "login": "octocat" }`
+- `401` token invalid/expired
+- `503` token not configured
+
+### GET /api/github/repos
+
+Lists repositories for authenticated user.
+
+**Response:** `200`
+```json
+{
+  "repos": [
+    {
+      "full_name": "owner/repo",
+      "html_url": "https://github.com/owner/repo",
+      "clone_url": "https://github.com/owner/repo.git",
+      "private": true
+    }
+  ]
+}
+```
+
+### POST /api/github/repos
+
+Creates a repository for authenticated user.
+
+**Request body:**
+```json
+{
+  "name": "new-repo",
+  "private": false
+}
+```
+
+Constraints:
+- `name` required, regex: `^[a-zA-Z0-9._-]+$`
+
+Common statuses:
+- `201` created
+- `401` invalid/expired token
+- `422` invalid name / already exists
+- `503` token not configured
 
 ---
 
@@ -311,6 +446,120 @@ File tree for the project. Two modes via `source` query param.
 ```
 
 **Response (content/diff):** `200` — `text/plain` or `text/x-diff` body. `404` — Error JSON if no build or file not found.
+
+---
+
+## Repository Sync
+
+### POST /api/projects/[projectId]/repo/sync
+
+Syncs the local clone's base branch with `origin/<default_branch>`.
+
+Use this after merging PRs on GitHub so subsequent builds branch from an up-to-date base.
+
+**Response:**
+- `200` `{ "success": true, "branch": "main" }`
+
+**Common failures:**
+- `400` project missing repo URL / repo not found
+- `401` GitHub authentication/token failure
+- `502` upstream sync error
+
+---
+
+## Orchestration Coordination
+
+### Build Trigger
+
+#### POST /api/projects/[projectId]/orchestration/build
+
+Starts orchestration for a workflow or card scope.
+
+**Request body:**
+```json
+{
+  "scope": "workflow|card",
+  "workflow_id": "uuid (required when scope=workflow)",
+  "card_id": "uuid (required when scope=card)",
+  "trigger_type": "card|workflow|manual (optional)",
+  "initiated_by": "string (required actor identifier)"
+}
+```
+
+**Response:** `202`
+```json
+{
+  "runId": "uuid",
+  "assignmentIds": ["uuid"],
+  "message": "Build started",
+  "outcome_type": "success"
+}
+```
+
+When decision/validation issues block immediate execution, response remains structured with `outcome_type` and message.
+
+#### POST /api/projects/[projectId]/orchestration/resume-blocked
+
+Resumes a previously blocked assignment after user input is provided.
+
+**Request body:**
+```json
+{
+  "card_id": "uuid",
+  "actor": "user (optional)"
+}
+```
+
+**Response:** `202`
+```json
+{
+  "assignmentId": "uuid",
+  "runId": "uuid",
+  "message": "Build resumed",
+  "outcome_type": "success"
+}
+```
+
+### Approval Requests
+
+- `GET /api/projects/[projectId]/orchestration/approvals?run_id=<runId>` - list approvals for run
+- `POST /api/projects/[projectId]/orchestration/approvals` - create approval request (`run_id`, `approval_type=create_pr|merge_pr`, `requested_by`)
+- `GET /api/projects/[projectId]/orchestration/approvals/[approvalId]` - read single request
+- `PATCH /api/projects/[projectId]/orchestration/approvals/[approvalId]` - resolve request (`status=approved|rejected`, `resolved_by`, optional `notes`)
+
+### Pull Request Candidates
+
+- `GET /api/projects/[projectId]/orchestration/pull-requests?run_id=<runId>` - fetch PR candidate for run
+- `POST /api/projects/[projectId]/orchestration/pull-requests` - create candidate (`run_id`, `base_branch`, `head_branch`, `title`, `description`)
+- `GET /api/projects/[projectId]/orchestration/pull-requests/[prId]` - read single candidate
+- `PATCH /api/projects/[projectId]/orchestration/pull-requests/[prId]` - update status (`status=not_created|draft_open|open|merged|closed`, optional `pr_url`)
+
+---
+
+## Developer Utilities
+
+### POST /api/dev/restart-and-open
+
+Starts a built project's dev server from its local clone and opens a browser tab.
+
+**Request body:**
+```json
+{ "projectId": "uuid" }
+```
+
+Behavior and constraints:
+- Tries ports `3001..3010`; returns `503` if all are occupied.
+- Returns `409` if project repo clone does not exist yet (build at least once first).
+- Route is disabled on known hosted/cloud runtimes.
+- Route is enabled locally in `NODE_ENV=development` or when `DOSSIER_ALLOW_PROJECT_DEV_SERVER=1`.
+
+**Response:** `200`
+```json
+{
+  "ok": true,
+  "message": "Starting project server on port 3003 and opening new tab. Page will load in ~10 seconds."
+}
+```
 
 ---
 
