@@ -110,17 +110,17 @@ jobs:
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Download Windows installer
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dossier-windows-${{ steps.tag.outputs.version }}
 
       - name: Download Linux installer
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dossier-linux-${{ steps.tag.outputs.version }}
 
       - name: Download macOS installer
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dossier-macos-${{ steps.tag.outputs.version }}
 
