@@ -81,6 +81,68 @@ Update project.
 
 ---
 
+## Planning Chat
+
+### POST /api/projects/[projectId]/chat
+
+Non-streaming planning endpoint. Supports scaffold, populate, and finalize modes.
+
+**Request body:**
+```json
+{
+  "message": "Plan auth and profile flows",
+  "mode": "scaffold|populate|finalize (optional)",
+  "workflow_id": "uuid (required when mode=populate)",
+  "conversationHistory": [
+    { "role": "user|agent", "content": "string" }
+  ],
+  "mock_response": "string (test-only)"
+}
+```
+
+Behavior:
+- `mode=finalize` runs multi-step finalization and sets `project.finalized_at` on success.
+- `mode=populate` with `workflow_id` adds activities/cards for a single workflow.
+- no mode defaults to scaffold for empty maps or full planning for structured maps.
+
+**Response:** `200` (`ChatResponse`)
+```json
+{
+  "status": "success|error",
+  "responseType": "clarification|actions|mixed",
+  "message": "string",
+  "applied": 2,
+  "workflow_ids_created": ["uuid"],
+  "errors": [{ "action_type": "createCard", "reason": "..." }]
+}
+```
+
+### POST /api/projects/[projectId]/chat/stream
+
+Streaming SSE variant of planning chat. Supports `scaffold`, `populate`, and `finalize`.
+
+**Request body:**
+```json
+{
+  "message": "Create initial workflows",
+  "mode": "scaffold|populate|finalize (optional; defaults to scaffold)",
+  "workflow_id": "uuid (required when mode=populate)",
+  "mock_response": "string (test-only)"
+}
+```
+
+Common SSE events include:
+- `action` - parsed planning action
+- `error` - step failure
+- `phase_complete` - scaffold/populate/finalize phase completion metadata
+- `done` - terminal event
+
+Notes:
+- Both chat endpoints return `503` when planning is disabled (`NEXT_PUBLIC_PLANNING_LLM_ENABLED=false`).
+- Both validate request shape with Zod and return `400` on schema failures.
+
+---
+
 ## Setup & GitHub Integration
 
 ### GET /api/setup/status
@@ -283,6 +345,54 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
 
 Code-generation intents are rejected.
 
+### POST /api/projects/[projectId]/actions/preview
+
+Dry-run action preview. Computes deltas/summaries without writing to the database.
+
+**Request body:** Same as `POST /actions`
+
+**Response:** `200`
+```json
+{
+  "success": true,
+  "previews": [{ "summary": "Create workflow 'Checkout'" }],
+  "summary": ["Create workflow 'Checkout'"]
+}
+```
+
+---
+
+## Memory Plane
+
+### GET /api/projects/[projectId]/memory
+
+Lists memory units linked to the project and reports storage locations.
+
+Use this endpoint to verify that finalize/ingestion actually produced memory data.
+
+**Response:** `200`
+```json
+{
+  "projectId": "uuid",
+  "count": 3,
+  "units": [
+    {
+      "id": "uuid",
+      "title": "Auth constraints",
+      "content_type": "text",
+      "status": "active",
+      "updated_at": "2026-04-01T12:00:00.000Z",
+      "content_preview": "First 200 chars...",
+      "link_url": null
+    }
+  ],
+  "storage": {
+    "sqlite": "/home/user/.dossier/dossier.db",
+    "ruvector": "/home/user/.dossier/ruvector/vectors.db"
+  }
+}
+```
+
 ---
 
 ## Context Artifacts
@@ -403,6 +513,69 @@ Update or approve planned file. Use `{ "status": "approved" }` for approval.
 ### DELETE /api/projects/[projectId]/cards/[cardId]/planned-files/[fileId]
 
 Delete planned file.
+
+---
+
+## Card Finalization & Build Outputs
+
+### GET /api/projects/[projectId]/cards/[cardId]/finalize
+
+Returns the finalization package used for card approval:
+- card record
+- project-wide docs (`doc`, `spec`, `design`)
+- linked card artifacts
+- card requirements
+- planned files
+- current `finalized_at`
+
+**Response:** `200` object with keys:
+`card`, `project_docs`, `card_artifacts`, `requirements`, `planned_files`, `finalized_at`
+
+### POST /api/projects/[projectId]/cards/[cardId]/finalize
+
+Approves a card through a 3-step SSE workflow:
+1. link project docs to card
+2. generate e2e test/context artifact(s) via planning LLM
+3. stamp `card.finalized_at` and trigger memory ingestion when enabled
+
+Preconditions:
+- card belongs to project
+- project is already approved (`project.finalized_at` present)
+- card has at least one requirement
+- card has at least one planned file/folder
+- card is not already finalized
+
+**Response:** `200` `text/event-stream`
+
+Key events:
+- `finalize_progress` (step status updates)
+- `action` (created action/artifact events from LLM sub-step)
+- `phase_complete` (`responseType=card_finalize_complete`)
+- `error`
+- `done`
+
+### GET /api/projects/[projectId]/cards/[cardId]/produced-files
+
+Returns added/modified files from the latest completed assignment for this card.
+
+**Response:** `200`
+```json
+[
+  { "path": "src/app/page.tsx", "status": "modified" },
+  { "path": "src/lib/new-module.ts", "status": "added" }
+]
+```
+
+### POST /api/projects/[projectId]/cards/[cardId]/push
+
+Pushes the card's completed feature branch to GitHub.
+
+Common statuses:
+- `200` pushed successfully (`{ "success": true, "branch": "feature/..." }`)
+- `400` repository not connected
+- `401` token/auth failure
+- `409` no completed build assignment for card
+- `502` upstream push error
 
 ---
 
@@ -534,7 +707,61 @@ Resumes a previously blocked assignment after user input is provided.
 - `GET /api/projects/[projectId]/orchestration/pull-requests/[prId]` - read single candidate
 - `PATCH /api/projects/[projectId]/orchestration/pull-requests/[prId]` - update status (`status=not_created|draft_open|open|merged|closed`, optional `pr_url`)
 
+### Run & Assignment APIs
+
+- `GET /api/projects/[projectId]/orchestration/runs` - list runs; optional query filters: `scope`, `status`, `limit`
+- `POST /api/projects/[projectId]/orchestration/runs` - create run (`scope`, `workflow_id`/`card_id`, `initiated_by`, `repo_url`, `base_branch`, `run_input_snapshot`, optional `worktree_root`)
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]` - fetch run
+- `PATCH /api/projects/[projectId]/orchestration/runs/[runId]` - update run status with guarded transitions
+
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]/assignments` - list run assignments
+- `POST /api/projects/[projectId]/orchestration/runs/[runId]/assignments` - create assignment (`card_id`, `agent_role`, `agent_profile`, `feature_branch`, `allowed_paths`, ...)
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]/assignments/[assignmentId]` - fetch assignment
+- `POST /api/projects/[projectId]/orchestration/runs/[runId]/assignments/[assignmentId]/dispatch` - dispatch queued assignment; returns `202` with `executionId`
+
+### Run Checks
+
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]/checks` - list checks for a run
+- `POST /api/projects/[projectId]/orchestration/runs/[runId]/checks` - record check (`check_type`, `status`, optional `output`)
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]/checks/[checkId]` - fetch one check
+
+### Agent Webhook Receiver
+
+#### POST /api/projects/[projectId]/orchestration/webhooks/agentic-flow
+
+Receives agent execution callbacks and updates orchestration state.
+
+Required body fields:
+- `event_type`: `execution_started|commit_created|execution_completed|execution_failed|execution_blocked`
+- `assignment_id`: card assignment UUID
+
+**Response:** `202` `{ "received": true, "processed": true }`
+
 ---
+
+## Docs API
+
+### GET /api/docs
+
+Returns docs index parsed from `docs/docs-index.yaml`.
+
+**Response:** `200`
+```json
+{
+  "documents": [
+    { "id": "doc.system", "path": "SYSTEM_ARCHITECTURE.md", "tags": ["architecture"] }
+  ]
+}
+```
+
+### GET /api/docs?path=product/user-workflows-reference.md
+
+Returns a single documentation page from the `docs/` directory.
+
+Response:
+- `200` `{ "content": "..." }`
+- `400` invalid path traversal attempt
+- `404` file not found
 
 ## Developer Utilities
 
@@ -567,4 +794,4 @@ Behavior and constraints:
 
 - **Mutations**: All map changes go through the actions endpoint; no direct writes.
 - **Auth**: No auth/RLS; endpoints use anon access (single-user desktop app).
-- **Database**: SQLite only; no Supabase or Postgres.
+- **Database**: SQLite is the only implemented adapter. `DB_DRIVER=postgres` currently throws "Postgres adapter not yet implemented".

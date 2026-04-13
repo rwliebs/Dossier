@@ -1,6 +1,6 @@
 ---
 document_id: doc.development
-last_verified: 2026-04-06
+last_verified: 2026-04-13
 tokens_estimate: 700
 tags:
   - development
@@ -116,10 +116,14 @@ Default: `~/.dossier/`
 ~/.dossier/
   config       # API keys, settings (KEY=VALUE)
   dossier.db   # SQLite database
-  ruvector/   # Vector embeddings (future)
+  ruvector/    # Vector index storage used by memory plane
 ```
 
 Override: `DOSSIER_DATA_DIR` or `SQLITE_PATH`
+
+Inspect memory contents via:
+- `GET /api/projects/<projectId>/memory`
+- [domains/memory-reference.md](domains/memory-reference.md)
 
 ---
 

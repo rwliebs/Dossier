@@ -1,6 +1,6 @@
 ---
 document_id: doc.configuration
-last_verified: 2026-02-18
+last_verified: 2026-04-13
 tokens_estimate: 600
 tags:
   - configuration
@@ -51,13 +51,17 @@ Anthropic credential (API key or Claude CLI config) and GitHub token:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| DB_DRIVER | sqlite | `sqlite` or `postgres` |
-| DATABASE_URL | — | Postgres connection string (when DB_DRIVER=postgres) |
+| DB_DRIVER | sqlite | `sqlite` (implemented) or `postgres` (currently not implemented) |
+| DATABASE_URL | — | Required only if testing future Postgres adapter paths |
 | DOSSIER_DATA_DIR | ~/.dossier | Data directory |
 | SQLITE_PATH | ~/.dossier/dossier.db | Override SQLite path |
 | EMBEDDING_MODEL | all-MiniLM-L6-v2 | RuVector embedding model |
 | PLANNING_LLM_MODEL | claude-haiku-4-5-20251001 | Planning LLM model |
 | DOSSIER_STALE_RUN_MINUTES | 0 | Minutes before marking stuck runs as failed. 0 = disabled (no timeout). |
+
+Current implementation note:
+- `DB_DRIVER=postgres` will throw at startup (`lib/db/index.ts`): "Postgres adapter not yet implemented."
+- Use SQLite for local and production-like runs until a Postgres adapter is shipped.
 
 ---
 
