@@ -1,6 +1,6 @@
 ---
 document_id: doc.orchestration
-last_verified: 2026-03-06
+last_verified: 2026-04-20
 tokens_estimate: 950
 tags:
   - orchestration
@@ -10,7 +10,7 @@ anchors:
   - id: contract
     summary: "OrchestrationRun → CardAssignment; checks before approval; PR user-gated"
   - id: flow
-    summary: "createRun → assignments → agentic-flow → checks → approval → PR"
+    summary: "clone/sync → createRun → assignments → agentic-flow → checks → approval → PR"
   - id: policy
     summary: "SystemPolicyProfile: required_checks, protected_paths, forbidden_paths"
 ttl_expires_on: null
@@ -38,6 +38,7 @@ ttl_expires_on: null
 ```
 User trigger (card | workflow)
   → ensureClone (repo to ~/.dossier/repos/<projectId>/) — single-card only for MVP
+  → optional repo sync (`POST /api/projects/[projectId]/repo/sync`) to fast-forward local base branch from origin
   → createRun (validate policy, capture snapshots; worktree_root = clone path)
   → createFeatureBranch per card
   → createAssignment per card (feature_branch, worktree_path, allowed_paths, forbidden_paths)
@@ -75,11 +76,12 @@ dispatch.ts → createAgenticFlowClient() → SDK query()
 ### Key Files
 | File | Purpose |
 |------|---------|
-| `lib/orchestration/repo-manager.ts` | ensureClone, createFeatureBranch; clone to ~/.dossier/repos/ |
+| `lib/orchestration/repo-manager.ts` | ensureClone, syncMainBranch, createFeatureBranch; clone to ~/.dossier/repos/ |
 | `lib/orchestration/repo-reader.ts` | getRepoFileTree, getChangedFiles, getFileContent, getFileDiff |
 | `lib/orchestration/create-run.ts` | createRun; policy validation; snapshot capture |
 | `lib/orchestration/create-assignment.ts` | CardAssignment per card |
 | `lib/orchestration/trigger-build.ts` | Entry point; clones repo, creates branch, populates worktree_path |
+| `app/api/projects/[projectId]/repo/sync/route.ts` | User-triggered base branch sync endpoint before subsequent builds |
 | `lib/orchestration/dispatch.ts` | Dispatch to agentic-flow |
 | `lib/orchestration/execute-checks.ts` | Run required checks |
 | `lib/orchestration/approval-gates.ts` | Check pass before approval request |

@@ -39,7 +39,7 @@ docs/
 │   └── design-system.md
 │
 ├── adr/                      # Architecture Decision Records
-│   └── 0001-*.md through 0015-*.md
+│   └── 0001-*.md through 0016-*.md
 │
 ├── Feature Plans/            # Future feature plans
 │   ├── claude-plugin-packaging.md
