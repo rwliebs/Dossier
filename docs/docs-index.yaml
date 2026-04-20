@@ -12,11 +12,11 @@ docs_index:
         - id: overview
           summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
         - id: data-flow
-          summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
+          summary: "Planning SDK/CLI → actions → DbAdapter; Build → orchestration → agents"
         - id: endpoints
           summary: "REST API under /api/projects; map, actions, artifacts, cards"
       depends_on: []
-      last_verified: "2026-02-18"
+      last_verified: "2026-04-20"
 
     - id: doc.data-contracts
       path: domains/data-contracts-reference.md
@@ -76,7 +76,7 @@ docs_index:
         - id: modes
           summary: "Scaffold, populate, full; mode selected by map state"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-04-20"
 
     - id: doc.mutation
       path: domains/mutation-reference.md
@@ -110,9 +110,9 @@ docs_index:
         - id: contract
           summary: "OrchestrationRun → CardAssignment; checks before approval; PR user-gated"
         - id: flow
-          summary: "createRun → assignments → agentic-flow → checks → approval → PR"
+          summary: "clone/sync → createRun → assignments → agentic-flow → checks → approval → PR"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-04-20"
 
     - id: doc.testing
       path: testing-reference.md
@@ -189,3 +189,13 @@ docs_index:
           summary: "Desktop installers workflow: manual or on v* tag; download .exe, .deb, .dmg"
       depends_on: [doc.releases-distribution]
       last_verified: "2026-03-06"
+
+    - id: doc.adr-0016-planning-auth-paths
+      path: adr/0016-planning-agent-two-auth-paths.md
+      tokens_estimate: 500
+      tags: [adr, planning, llm, auth]
+      anchors:
+        - id: decision
+          summary: "Planning uses Agent SDK for credentialed users, CLI fallback when no extractable credential exists"
+      depends_on: [doc.system-architecture, doc.planning]
+      last_verified: "2026-04-20"
