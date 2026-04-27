@@ -58,13 +58,15 @@ docs_index:
 
     - id: doc.api-reference
       path: domains/api-reference.md
-      tokens_estimate: 400
+      tokens_estimate: 450
       tags: [api, endpoints]
       anchors:
         - id: endpoints
           summary: "REST API under /api/projects; map, actions, artifacts, cards"
+        - id: developer-utilities
+          summary: "Local-only dev preview endpoint starts project clone servers"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-04-27"
 
     - id: doc.planning
       path: domains/planning-reference.md
@@ -128,13 +130,15 @@ docs_index:
 
     - id: doc.development
       path: development-reference.md
-      tokens_estimate: 700
+      tokens_estimate: 850
       tags: [development, setup, workflow]
       anchors:
         - id: setup
-          summary: "Node 18+, npm install, .env.local"
+          summary: "Node 20+, npm/pnpm install, /setup or config file"
+        - id: dev-preview
+          summary: "View built project from clone; local-only route, hosted disabled"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-04-27"
 
     - id: doc.database-schema
       path: reference/database-schema.md
