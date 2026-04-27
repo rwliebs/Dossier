@@ -1,13 +1,15 @@
 ---
 document_id: doc.api-reference
-last_verified: 2026-02-18
-tokens_estimate: 400
+last_verified: 2026-04-27
+tokens_estimate: 450
 tags:
   - api
   - endpoints
 anchors:
   - id: endpoints
     summary: "REST API under /api/projects; map, actions, artifacts, cards"
+  - id: developer-utilities
+    summary: "Local-only dev preview endpoint starts project clone servers"
 ttl_expires_on: null
 ---
 # API Reference
@@ -31,6 +33,7 @@ ttl_expires_on: null
 | Card knowledge | `/api/projects/[id]/cards/[cardId]/{requirements,facts,assumptions,questions}` | Knowledge items |
 | Planned files | `/api/projects/[id]/cards/[cardId]/planned-files` | Card planned files |
 | Files | `/api/projects/[id]/files` | File tree (planned or repo); `?source=repo` for produced code |
+| Developer utilities | `/api/dev/restart-and-open` | Local-only project clone preview server |
 
 ## Related
 - [data-contracts-reference.md](data-contracts-reference.md)

@@ -1,7 +1,7 @@
 ---
 document_id: doc.development
-last_verified: 2026-04-06
-tokens_estimate: 700
+last_verified: 2026-04-27
+tokens_estimate: 850
 tags:
   - development
   - setup
@@ -13,6 +13,8 @@ anchors:
     summary: "dev, build, test, dossier, rebuild"
   - id: ports
     summary: "3000 app; 3001-3010 project preview via restart-and-open"
+  - id: dev-preview
+    summary: "View built project from clone; local-only route, hosted disabled"
   - id: github-connect
     summary: "OAuth PKCE + PAT fallback + disconnect behavior"
   - id: troubleshooting
@@ -158,15 +160,21 @@ Expected: `202` with `assignmentId`, `runId`, and `outcome_type`.
 
 ### View built project in a separate dev server
 
-Use `/api/dev/restart-and-open` to start a cloned project server on ports `3001..3010` without touching the main Dossier app on `3000`.
+Use `/api/dev/restart-and-open` to start a built project's cloned repo on ports `3001..3010` without touching the main Dossier app on `3000`. The route runs `npm run dev` inside `~/.dossier/repos/<projectId>/`, waits briefly, then opens `http://localhost:<previewPort>`.
 
-Common responses:
-- `200` started successfully
-- `409` clone missing (build at least once first)
-- `503` no free preview port in range
-- `404` route disabled (hosted runtime / missing enable flag)
+```bash
+curl -X POST "http://localhost:3000/api/dev/restart-and-open" \
+  -H "Content-Type: application/json" \
+  -d '{"projectId":"<projectId>"}'
+```
 
-On standalone/Electron/CLI production builds, set `DOSSIER_ALLOW_PROJECT_DEV_SERVER=1` to allow this route.
+Constraints:
+- Requires a JSON body with `projectId`; missing or invalid JSON returns `400`.
+- Requires the project clone to exist under `~/.dossier/repos/<projectId>`; missing clone returns `409` (build at least once first).
+- Scans `3001..3010` and returns `503` when no preview port is free.
+- Enabled in `NODE_ENV=development`, or in local standalone/Electron/CLI builds when `DOSSIER_ALLOW_PROJECT_DEV_SERVER=1`.
+- Disabled with `404` on detected hosted runtimes (`VERCEL`, `NETLIFY`, Cloudflare Pages, AWS, Fly, Railway, Render, Cloud Run, Heroku), even if the allow flag is set.
+- Preview process logs are appended to the OS temp directory at `dossier/view-<port>.log`.
 
 ---
 
@@ -190,9 +198,12 @@ Typical causes:
 ### Preview server does not open
 
 Check:
+- request body includes `{ "projectId": "<projectId>" }`
 - project clone exists under `~/.dossier/repos/<projectId>`
+- cloned project defines a working `npm run dev` script
 - free port exists in `3001..3010`
 - runtime allows route (`NODE_ENV=development` or `DOSSIER_ALLOW_PROJECT_DEV_SERVER=1`, and not hosted cloud detection)
+- process output in the temp log: `dossier/view-<port>.log`
 
 ## Verification
 - [ ] `npm run dev` starts on 3000

@@ -547,11 +547,24 @@ Starts a built project's dev server from its local clone and opens a browser tab
 { "projectId": "uuid" }
 ```
 
-Behavior and constraints:
-- Tries ports `3001..3010`; returns `503` if all are occupied.
-- Returns `409` if project repo clone does not exist yet (build at least once first).
-- Route is disabled on known hosted/cloud runtimes.
-- Route is enabled locally in `NODE_ENV=development` or when `DOSSIER_ALLOW_PROJECT_DEV_SERVER=1`.
+Behavior:
+- Resolves the clone with `getClonePath(projectId)` (`~/.dossier/repos/<projectId>/`).
+- Spawns `npm run dev` in the clone with `PORT=<first free preview port>`.
+- Scans ports `3001..3010`; does not restart or kill the primary Dossier server on `3000`.
+- Opens `http://localhost:<previewPort>` after a short startup delay.
+- Writes child process output to the OS temp directory at `dossier/view-<port>.log`.
+
+Availability constraints:
+- Enabled in `NODE_ENV=development`.
+- Enabled in local standalone/Electron/CLI production builds when `DOSSIER_ALLOW_PROJECT_DEV_SERVER=1`.
+- Disabled with `404` on detected hosted/cloud runtimes (`VERCEL`, `NETLIFY`, `CF_PAGES=1`, `AWS_EXECUTION_ENV`, `FLY_APP_NAME`, `RAILWAY_ENVIRONMENT`, `RENDER`, `K_SERVICE`, `HEROKU_APP_NAME`), even when the allow flag is set.
+
+Common statuses:
+- `200` started successfully
+- `400` invalid JSON or missing `projectId`
+- `404` route disabled for this runtime
+- `409` project repo clone does not exist yet (build at least once first)
+- `503` no free port in `3001..3010`
 
 **Response:** `200`
 ```json
