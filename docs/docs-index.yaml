@@ -182,10 +182,12 @@ docs_index:
 
     - id: doc.desktop-build-distribution
       path: reference/desktop-build-and-distribution.md
-      tokens_estimate: 600
-      tags: [releases, desktop, electron, windows, linux, macos, installers]
+      tokens_estimate: 1400
+      tags: [releases, desktop, electron, windows, linux, macos, installers, npm, dependabot]
       anchors:
-        - id: ci
-          summary: "Desktop installers workflow: manual or on v* tag; download .exe, .deb, .dmg"
+        - id: desktop-installer-ci
+          summary: "Desktop installers workflow builds .exe, .deb, .dmg and releases v* tags"
+        - id: npm-package-publishing
+          summary: "Trusted Publisher npm release flow for v* tags"
       depends_on: [doc.releases-distribution]
-      last_verified: "2026-03-06"
+      last_verified: "2026-05-04"
