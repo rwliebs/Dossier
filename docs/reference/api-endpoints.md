@@ -14,6 +14,26 @@ REST API for the Dossier planning and build system. All routes under `/api`. SQL
 - Local: `http://localhost:3000`
 - All routes are under `/api`
 
+## Docs Browser
+
+### GET /api/docs
+
+Returns reference documentation registered in `docs/docs-index.yaml`. Used by the Docs panel.
+
+**Query params:**
+
+| Param | Description |
+|-------|-------------|
+| `path` | Optional docs-relative path. When present, returns that document content. |
+
+**Responses:**
+- `200` `{ "documents": [{ "id": "doc.planning", "path": "domains/planning-reference.md", "tags": [...] }] }`
+- `200` `{ "content": "# ..." }` when `path` is provided
+- `400` invalid path traversal attempt
+- `404` doc not found
+
+---
+
 ## Error Response Format
 
 All errors return JSON:
@@ -282,6 +302,73 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
 | `setCardKnowledgeStatus` | Set status (draft/approved/rejected) on a knowledge item |
 
 Code-generation intents are rejected.
+
+---
+
+## Planning Chat & Finalization
+
+### POST /api/projects/[projectId]/chat
+
+Non-streaming planning endpoint. Applies validated actions directly to SQLite.
+
+**Request body:**
+```json
+{
+  "message": "string",
+  "mode": "scaffold|populate|finalize (optional)",
+  "workflow_id": "uuid (required when mode=populate)",
+  "conversationHistory": [{ "role": "user|agent", "content": "string" }]
+}
+```
+
+Behavior:
+- `mode=scaffold`: applies only project/workflow scaffold actions.
+- `mode=populate`: populates one workflow identified by `workflow_id`.
+- `mode=finalize`: creates all required project context artifacts, writes scaffold/root files to a connected repo clone when available, and sets `project.finalized_at` only after every required artifact is created.
+- No mode: routes to scaffold for empty maps, otherwise full planning.
+
+Common statuses: `200` success, `400` invalid JSON/body, `404` project or workflow missing, `502` LLM/finalize failure, `503` planning LLM disabled.
+
+### POST /api/projects/[projectId]/chat/stream
+
+Streaming SSE version of planning chat for scaffold, populate, and project finalize modes. Uses the same request body as `/chat` except `conversationHistory` is not accepted.
+
+SSE events include `message`, `action`, `error`, `finalize_progress`, `phase_complete`, and `done`.
+
+### GET /api/projects/[projectId]/cards/[cardId]/finalize
+
+Returns the current card finalization package without changing state.
+
+**Response:** `200`
+```json
+{
+  "card": {},
+  "project_docs": [],
+  "card_artifacts": [],
+  "requirements": [],
+  "planned_files": [],
+  "finalized_at": null
+}
+```
+
+### POST /api/projects/[projectId]/cards/[cardId]/finalize
+
+Approves/finalizes a card through an SSE stream. There is no separate `/finalize/confirm` endpoint.
+
+Gates before streaming:
+- Card must belong to the project and not already be approved.
+- `project.finalized_at` must already be set.
+- Card must have at least one requirement.
+- Card must have at least one planned file or folder.
+- Planning LLM must be enabled.
+
+SSE behavior:
+- Links project `doc`, `spec`, and `design` artifacts to the card.
+- Generates e2e test/context artifacts through the planning LLM.
+- Sets `card.finalized_at` and ingests card context into memory when enabled.
+- Emits `finalize_progress`, `action`, `error`, `phase_complete`, and `done`.
+
+Common statuses: `200` SSE stream, `400` validation failure, `404` card missing, `503` planning LLM disabled.
 
 ---
 

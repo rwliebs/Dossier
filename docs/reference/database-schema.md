@@ -1,6 +1,6 @@
 ---
 document_id: doc.database-schema
-last_verified: 2026-02-18
+last_verified: 2026-05-11
 tokens_estimate: 900
 tags:
   - database
@@ -8,9 +8,9 @@ tags:
   - sqlite
 anchors:
   - id: tables
-    summary: "project, workflow, card, planning_action, context_artifact, memory_unit"
+    summary: "project, workflow, card, planning_action, context_artifact, memory_unit; finalization gates"
   - id: migrations
-    summary: "lib/db/migrate.ts; 001-005; _migrations table"
+    summary: "lib/db/migrate.ts; 001-012; _migrations table"
 ttl_expires_on: null
 ---
 # Database Schema Reference
@@ -31,11 +31,11 @@ ttl_expires_on: null
 
 | Table | Purpose |
 |-------|---------|
-| project | Projects; name, repo_url, default_branch, action_sequence |
+| project | Projects; name, repo_url, default_branch, action_sequence, finalized_at |
 | workflow | Workflows per project; position-ordered |
 | workflow_activity | Activities per workflow; color, position |
 | step | (Migration 005: removed) |
-| card | Cards per activity; status, priority, build_state |
+| card | Cards per activity; status, priority, build_state, finalized_at, last_build_error |
 | planning_action | Action log; idempotency_key for dedup |
 | context_artifact | Project-level context; type, content, uri, integration_ref |
 | card_context_artifact | Card ↔ artifact many-to-many |
@@ -64,6 +64,13 @@ ttl_expires_on: null
 | 003_memory.sql | memory_unit, memory_unit_relation, memory_retrieval_log |
 | 004_project_description.sql | Add project.description |
 | 005_remove_steps.sql | Remove step table; cards direct to activity |
+| 006_project_context_fields.sql | Add product/context fields to project |
+| 007_project_design_inspiration.sql | Add project design inspiration |
+| 008_finalization_phase.sql | Add `card.finalized_at`; allow test context artifacts |
+| 009_card_last_build_error.sql | Add last build error to card |
+| 010_project_finalized_at.sql | Add `project.finalized_at` for project-before-cards gate |
+| 011_context_artifact_type_scaffold.sql | Allow scaffold context artifacts |
+| 012_card_assignment_session_id.sql | Track agent session id on card assignment |
 
 ---
 
@@ -72,6 +79,8 @@ ttl_expires_on: null
 - `context_artifact`: at least one of content, uri, integration_ref
 - `orchestration_run`: scope=workflow → workflow_id required; scope=card → card_id required
 - `planning_action`: idempotency unique per (project_id, idempotency_key)
+- `project.finalized_at`: set only after project finalize creates all required project artifacts
+- `card.finalized_at`: set by card finalize POST after the project is finalized and card requirements/planned files exist
 
 ---
 

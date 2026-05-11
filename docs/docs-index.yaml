@@ -12,11 +12,11 @@ docs_index:
         - id: overview
           summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
         - id: data-flow
-          summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
+          summary: "Planning LLM → Agent SDK/CLI → actions → DbAdapter; Build → orchestration → agents"
         - id: endpoints
           summary: "REST API under /api/projects; map, actions, artifacts, cards"
       depends_on: []
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-11"
 
     - id: doc.data-contracts
       path: domains/data-contracts-reference.md
@@ -54,7 +54,7 @@ docs_index:
         - id: workflow-c
           summary: "Build trigger to draft PR: agents, checks, approval"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-11"
 
     - id: doc.api-reference
       path: domains/api-reference.md
@@ -62,9 +62,9 @@ docs_index:
       tags: [api, endpoints]
       anchors:
         - id: endpoints
-          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+          summary: "REST API under /api; projects, docs, chat, finalize, orchestration"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-11"
 
     - id: doc.planning
       path: domains/planning-reference.md
@@ -74,9 +74,9 @@ docs_index:
         - id: contract
           summary: "Planning LLM converts ideas to PlanningAction[]; never code-gen"
         - id: modes
-          summary: "Scaffold, populate, full; mode selected by map state"
+          summary: "Scaffold, populate, full, finalize; mode selected by map state"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-11"
 
     - id: doc.mutation
       path: domains/mutation-reference.md
@@ -142,9 +142,9 @@ docs_index:
       tags: [database, schema]
       anchors:
         - id: tables
-          summary: "project, workflow, card, planning_action"
+          summary: "project, workflow, card, planning_action; finalization columns"
       depends_on: [doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-11"
 
     - id: doc.configuration
       path: reference/configuration-reference.md

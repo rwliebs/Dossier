@@ -1,6 +1,6 @@
 ---
 document_id: doc.user-workflows
-last_verified: 2026-03-28
+last_verified: 2026-05-11
 tokens_estimate: 1200
 tags:
   - ux
@@ -23,7 +23,7 @@ ttl_expires_on: null
 
 ### Invariants
 - INVARIANT: Map structure is Workflow → Activity → Step → Card; all mutations via PlanningAction
-- INVARIANT: Build cannot trigger without finalized cards (planned files or folders are required; user must approve at least one per card before finalization. For new builds, the agent may propose folder paths (e.g. components/auth/) where files should go.)
+- INVARIANT: Build cannot trigger without finalized cards; card finalization requires at least one requirement and at least one planned file or folder. For new builds, the agent may propose folder paths (e.g. components/auth/) where files should go.
 - INVARIANT: Project must be finalized before cards can be finalized
 - INVARIANT: Build cannot trigger without card.finalized_at set (card finalization confirmed)
 - INVARIANT: Knowledge items (requirements, facts, assumptions, questions) are used when they exist; no approval step
@@ -81,16 +81,16 @@ Workflows for building software from scratch in Dossier.
 | 5 | User | Sees map on canvas; edits, reorders, refines |
 | 6 | User | Clicks **Finalize Project** when ready |
 | 7 | System | Creates and links remote repo (user creates via Connect Repository or links existing) |
-| 8 | Planning LLM (finalize mode) | Produces project-wide context docs (architectural summary, data contracts, domain summaries, workflow summaries, design system) + per-card e2e tests |
+| 8 | Planning LLM (finalize mode) | Produces required project artifacts: architectural summary, data contracts, domain summaries, workflow summaries, design system, and project scaffold |
 | 9 | System | Persists via PlanningAction; refresh retains state |
 
 **Success outcomes**:
 - Workflows created (backbone); activities and cards added in Workflow 2
 - Remote repo created and linked at finalization
-- Project-level context documents and per-card e2e tests created
+- Project-level context artifacts and runnable scaffold files created
 - User can refresh and see persisted state
 
-**Data flow**: `User chat → POST /chat/stream → stream-action-parser → POST /actions → apply-action → DbAdapter`; repo creation via Connect Repository at finalization
+**Data flow**: `User chat → POST /chat/stream → Agent SDK/CLI → stream-action-parser → validatePlanningOutput → pipelineApply → DbAdapter`; repo connection via Connect Repository, with scaffold/root writes during project finalization when a real repo is connected
 
 ---
 
@@ -120,8 +120,8 @@ Workflows for building software from scratch in Dossier.
 | Step | Actor | Action |
 |------|-------|--------|
 | 1 | Agent | Proposes requirements, planned files, knowledge items; user can add or edit any directly |
-| 2 | User | Reviews and approves agent-proposed planned files or folders per card (required; agent may propose folder paths for new builds) |
-| 3 | User | Clicks **Finalize** on each card (validates requirements and approved planned files/folders; sets finalized_at) |
+| 2 | User | Reviews and edits agent-proposed planned files or folders per card (at least one is required; agent may propose folder paths for new builds) |
+| 3 | User | Clicks **Finalize** on each card (validates requirements and planned files/folders; generates e2e test/context artifacts; sets finalized_at) |
 | 4 | User | Clicks **Build** on a card (or Build All for workflow) |
 | 5 | System | Validates: card has finalized_at; rejects with toast if not |
 | 6 | System | Clones repo, creates feature branch per card build, runs agents, executes checks |
