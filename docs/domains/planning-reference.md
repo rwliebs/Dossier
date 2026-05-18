@@ -1,7 +1,7 @@
 ---
 document_id: doc.planning
-last_verified: 2026-03-06
-tokens_estimate: 750
+last_verified: 2026-05-18
+tokens_estimate: 950
 tags:
   - planning
   - llm
@@ -10,9 +10,9 @@ anchors:
   - id: contract
     summary: "Planning LLM converts ideas to PlanningAction[]; never code-gen"
   - id: modes
-    summary: "Scaffold, populate, full; mode selected by map state"
+    summary: "Scaffold, populate, full, finalize; mode selected by map state"
   - id: flow
-    summary: "Chat → Claude → stream-action-parser → actions"
+    summary: "Chat → Agent SDK or CLI → stream-action-parser → actions"
 ttl_expires_on: null
 ---
 # Planning Domain Reference
@@ -47,23 +47,36 @@ Mode selected by `lib/llm/planning-prompt.ts` based on map state.
 
 ### Flow
 ```
-User message → POST /chat/stream
+User message → POST /api/projects/[projectId]/chat/stream
   → buildPlanningSystemPrompt() | buildScaffoldSystemPrompt() | buildPopulateSystemPrompt() | buildFinalizeSystemPrompt()
-  → Claude API (streaming)
+  → resolvePlanningCredential()
+  → if credential exists: planning-sdk-runner query()
+     - WebSearch always
+     - Read, Glob, Grep only when repo cwd is available
+  → else if Claude CLI is authenticated: claude -p --output-format stream-json
   → stream-action-parser (parse JSON blocks)
   → PlanningAction[] emitted
-  → POST /actions (validate + apply)
+  → POST /api/projects/[projectId]/actions (validate + apply)
 ```
 
 ### Per-Card Finalize Flow
 ```
-User clicks "Finalize" on card → POST /cards/[cardId]/finalize
-  → Assemble: project-wide docs + card context + e2e tests
-  → Return finalization package for review
-  → User edits (optional)
-  → POST /cards/[cardId]/finalize/confirm
-  → Set card.finalized_at → card is build-ready
+GET /api/projects/[projectId]/cards/[cardId]/finalize
+  → Assemble review package: project docs + card artifacts + requirements + planned files
+
+User clicks "Finalize" on card → POST /api/projects/[projectId]/cards/[cardId]/finalize
+  → SSE finalize_progress: link project docs to card
+  → SSE action: createContextArtifact for generated e2e/context artifacts
+  → SSE finalize_progress: set card.finalized_at and ingest memory when enabled
+  → SSE phase_complete: card_finalize_complete
+  → SSE done
 ```
+
+Constraints enforced before POST streaming starts:
+- Card must belong to the project and not already be finalized.
+- Project must be finalized first.
+- Card must have at least one requirement and one planned file.
+- `NEXT_PUBLIC_PLANNING_LLM_ENABLED=true` must enable the planning LLM.
 
 ### Key Files
 | File | Purpose |
@@ -71,11 +84,14 @@ User clicks "Finalize" on card → POST /cards/[cardId]/finalize
 | `lib/llm/planning-prompt.ts` | System prompts; mode selection |
 | `lib/llm/stream-action-parser.ts` | Parse streaming JSON → actions |
 | `lib/llm/build-preview-response.ts` | Preview response before apply |
-| `lib/llm/claude-client.ts` | Planning LLM client (Messages API) |
-| `lib/llm/planning-credential.ts` | Resolves ANTHROPIC_API_KEY from env or ~/.dossier/config |
+| `lib/llm/claude-client.ts` | Planning auth routing; Agent SDK path with CLI subprocess fallback |
+| `lib/llm/planning-sdk-runner.ts` | Agent SDK `query()` runner; read-only planning tools |
+| `lib/llm/planning-sdk-bridge.ts` | Converts SDK result text into planning response shape |
+| `lib/llm/planning-credential.ts` | Resolves env/config/Claude CLI credentials for planning |
+| `lib/llm/run-llm-substep.ts` | Finalize sub-step runner that filters generated actions |
 | `app/api/projects/[id]/chat/route.ts` | Non-streaming chat |
 | `app/api/projects/[id]/chat/stream/route.ts` | Streaming chat (scaffold, populate, finalize) |
-| `app/api/projects/[id]/cards/[cardId]/finalize/route.ts` | Per-card finalize endpoint |
+| `app/api/projects/[id]/cards/[cardId]/finalize/route.ts` | GET review package and POST SSE card finalization |
 
 ### Response Types
 - `clarification`: Questions only; `actions: []`
@@ -88,6 +104,7 @@ User clicks "Finalize" on card → POST /cards/[cardId]/finalize
 - [ ] No action proposes code generation (validate-action rejects)
 - [ ] Prompt instructs LLM to use existing IDs from context
 - [ ] User actions follow-up after populate (agent prompts for View Details, Build, etc.)
+- [ ] Finalize docs match GET package plus POST SSE behavior; no separate confirm route
 
 ## Related
 - [mutation-reference.md](mutation-reference.md)
