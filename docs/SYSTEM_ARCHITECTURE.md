@@ -1,14 +1,14 @@
 ---
 document_id: doc.system-architecture
-last_verified: 2026-03-06
-tokens_estimate: 950
+last_verified: 2026-05-18
+tokens_estimate: 1050
 tags:
   - architecture
   - system
   - overview
 anchors:
   - id: overview
-    summary: "Desktop Next.js + Electron app; SQLite, agentic-flow, RuVector"
+    summary: "Desktop Next.js + Electron app; SQLite, Agent SDK, RuVector"
   - id: data-model
     summary: "Project → Workflow → Activity → Card; knowledge items; orchestration entities"
   - id: data-flow
@@ -43,7 +43,7 @@ Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stor
 ┌─────────────────────────────────────────────────────────────┐
 │  Electron Shell                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  Next.js 15 (standalone)                              │   │
+│  │  Next.js 16 (standalone)                              │   │
 │  │  ┌──────────┐  ┌──────────┐  ┌───────────────────┐   │   │
 │  │  │ React 19 │  │ API      │  │ Claude Agent SDK  │   │   │
 │  │  │ UI       │──│ Routes   │──│ (in-process,      │   │   │
@@ -73,7 +73,7 @@ Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stor
 | UI | React 19 + Tailwind v4 + shadcn/ui | `app/`, `components/` |
 | API | Next.js App Router (route handlers) | `app/api/` |
 | Database | SQLite via better-sqlite3 (local, no Supabase) | `lib/db/` |
-| Planning LLM | Anthropic Claude (streaming + non-streaming) | `lib/llm/` |
+| Planning LLM | Claude Agent SDK `query()` with CLI fallback | `lib/llm/` |
 | Build agents | `@anthropic-ai/claude-agent-sdk` `query()` (streaming, in-process) | `lib/orchestration/` |
 | Agent definitions | agentic-flow registry (system prompts only) | `node_modules/agentic-flow/` |
 | Embeddings | all-MiniLM-L6-v2 (ONNX WASM, local) | `lib/memory/embedding.ts` |
@@ -106,7 +106,7 @@ Full schema details: [data-contracts-reference.md](domains/data-contracts-refere
 ## Data Flow (Summaries)
 
 ### Planning
-`User chat → Anthropic streaming API → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
+`User chat → resolve credential → Agent SDK query() or claude CLI fallback → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
 
 Detail: [planning-reference.md](domains/planning-reference.md)
 
@@ -138,14 +138,16 @@ Two distinct connection patterns exist.
 
 | Concern | Planning LLM | Build Agent |
 |---------|-------------|-------------|
-| Auth | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
-| SDK | `@anthropic-ai/sdk` (Messages API) | `@anthropic-ai/claude-agent-sdk` |
-| Call style | `messages.create` / `messages.stream` | `query()` — async iterator |
+| Auth | `ANTHROPIC_API_KEY`, `~/.dossier/config`, Claude CLI settings, or CLI subprocess fallback | `ANTHROPIC_API_KEY` |
+| SDK | `@anthropic-ai/claude-agent-sdk`; no-credential fallback uses `claude -p` | `@anthropic-ai/claude-agent-sdk` |
+| Call style | `query()` result text; CLI uses JSON / stream-json stdout | `query()` — async iterator |
 | Streaming | Optional (non-streaming for simple calls, streaming for chat) | Always streaming (`for await` over messages) |
-| Tools | None (text output only) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
-| CWD | N/A | `worktree_path` (repo clone) |
+| Tools | WebSearch always; Read, Glob, Grep only when repo `cwd` is available | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
+| CWD | Repo clone when connected; otherwise none | `worktree_path` (repo clone) |
 | Lifecycle | Request-response per chat turn | Fire-and-forget; result via in-process webhook callback |
 | Model | `claude-haiku-4-5-20251001` (configurable) | `claude-sonnet-4-5-20250929` (configurable) |
+
+Credentialed planning passes API keys via `ANTHROPIC_API_KEY`; OAuth tokens from Claude Code settings are passed as `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_AUTH_TOKEN`. See [ADR 0016](adr/0016-planning-agent-two-auth-paths.md).
 
 ---
 

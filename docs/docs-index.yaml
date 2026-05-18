@@ -6,17 +6,17 @@ docs_index:
   documents:
     - id: doc.system-architecture
       path: SYSTEM_ARCHITECTURE.md
-      tokens_estimate: 1200
+      tokens_estimate: 1250
       tags: [architecture, system, overview]
       anchors:
         - id: overview
-          summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
+          summary: "Self-deployable Next.js app; SQLite + Agent SDK + RuVector"
         - id: data-flow
-          summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
+          summary: "Planning → Agent SDK/CLI → actions; Build → Agent SDK → agents"
         - id: endpoints
-          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+          summary: "REST API under /api; projects, docs, setup, orchestration"
       depends_on: []
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-18"
 
     - id: doc.data-contracts
       path: domains/data-contracts-reference.md
@@ -58,25 +58,25 @@ docs_index:
 
     - id: doc.api-reference
       path: domains/api-reference.md
-      tokens_estimate: 400
+      tokens_estimate: 500
       tags: [api, endpoints]
       anchors:
         - id: endpoints
-          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+          summary: "REST API under /api; projects, docs, setup, orchestration"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-18"
 
     - id: doc.planning
       path: domains/planning-reference.md
-      tokens_estimate: 700
+      tokens_estimate: 950
       tags: [planning, llm, chat]
       anchors:
         - id: contract
           summary: "Planning LLM converts ideas to PlanningAction[]; never code-gen"
         - id: modes
-          summary: "Scaffold, populate, full; mode selected by map state"
+          summary: "Scaffold, populate, full, finalize; mode selected by map state"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-18"
 
     - id: doc.mutation
       path: domains/mutation-reference.md
@@ -104,15 +104,15 @@ docs_index:
 
     - id: doc.orchestration
       path: domains/orchestration-reference.md
-      tokens_estimate: 750
+      tokens_estimate: 1000
       tags: [orchestration, build, runs]
       anchors:
         - id: contract
           summary: "OrchestrationRun → CardAssignment; checks before approval; PR user-gated"
         - id: flow
-          summary: "createRun → assignments → agentic-flow → checks → approval → PR"
+          summary: "createRun → assignments → Agent SDK → checks → approval → PR"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-18"
 
     - id: doc.testing
       path: testing-reference.md

@@ -1,7 +1,7 @@
 ---
 document_id: doc.orchestration
-last_verified: 2026-03-06
-tokens_estimate: 950
+last_verified: 2026-05-18
+tokens_estimate: 1000
 tags:
   - orchestration
   - build
@@ -10,7 +10,7 @@ anchors:
   - id: contract
     summary: "OrchestrationRun → CardAssignment; checks before approval; PR user-gated"
   - id: flow
-    summary: "createRun → assignments → agentic-flow → checks → approval → PR"
+    summary: "createRun → assignments → Agent SDK → checks → approval → PR"
   - id: policy
     summary: "SystemPolicyProfile: required_checks, protected_paths, forbidden_paths"
 ttl_expires_on: null
@@ -41,7 +41,7 @@ User trigger (card | workflow)
   → createRun (validate policy, capture snapshots; worktree_root = clone path)
   → createFeatureBranch per card
   → createAssignment per card (feature_branch, worktree_path, allowed_paths, forbidden_paths)
-  → dispatch to agentic-flow (cwd = worktree_path)
+  → dispatch to in-process Claude Agent SDK (cwd = worktree_path)
   → agents write files, commit to feature branch
   → GET /api/projects/[id]/files?source=repo surfaces produced files with diff status
   → execute checks (dependency, security, policy, lint, unit, integration, e2e)
@@ -80,7 +80,8 @@ dispatch.ts → createAgenticFlowClient() → SDK query()
 | `lib/orchestration/create-run.ts` | createRun; policy validation; snapshot capture |
 | `lib/orchestration/create-assignment.ts` | CardAssignment per card |
 | `lib/orchestration/trigger-build.ts` | Entry point; clones repo, creates branch, populates worktree_path |
-| `lib/orchestration/dispatch.ts` | Dispatch to agentic-flow |
+| `lib/orchestration/dispatch.ts` | Build assignment payload and dispatch to execution client |
+| `lib/orchestration/agentic-flow-client.ts` | Direct Agent SDK `query()` execution using agentic-flow prompts |
 | `lib/orchestration/execute-checks.ts` | Run required checks |
 | `lib/orchestration/approval-gates.ts` | Check pass before approval request |
 | `lib/orchestration/create-approval-request.ts` | ApprovalRequest creation |

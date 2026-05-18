@@ -536,6 +536,38 @@ Resumes a previously blocked assignment after user input is provided.
 
 ---
 
+## Documentation Browser
+
+### GET /api/docs
+
+Returns documentation metadata from `docs/docs-index.yaml` for the in-app Docs panel, or returns one document's Markdown content when `path` is provided.
+
+**Query params:**
+
+| Param | Description |
+|-------|-------------|
+| `path` | Optional path relative to `docs/`, for example `domains/planning-reference.md` |
+
+**Response without `path`:** `200`
+```json
+{
+  "documents": [
+    { "id": "doc.planning", "path": "domains/planning-reference.md", "tags": ["planning", "llm", "chat"] }
+  ]
+}
+```
+
+**Response with `path`:** `200`
+```json
+{ "content": "# Planning Domain Reference\n..." }
+```
+
+Constraints:
+- Paths are normalized and confined under the repository `docs/` directory.
+- Missing docs return `404`; invalid traversal paths return `400`.
+
+---
+
 ## Developer Utilities
 
 ### POST /api/dev/restart-and-open
