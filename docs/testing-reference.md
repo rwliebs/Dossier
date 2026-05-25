@@ -1,16 +1,16 @@
 ---
 document_id: doc.testing
-last_verified: 2026-02-19
-tokens_estimate: 900
+last_verified: 2026-05-25
+tokens_estimate: 1050
 tags:
   - testing
   - vitest
   - quality
 anchors:
   - id: commands
-    summary: "npm run test, test:watch, test:coverage, test:planning, test:e2e"
+    summary: "npm run test, test:planning, test:e2e, test:examples, targeted Vitest paths"
   - id: structure
-    summary: "__tests__/ mirrors lib/; components, api, mutations, orchestration"
+    summary: "__tests__/ covers top-level llm, lib, api, e2e, github, orchestration"
   - id: mocking
     summary: "Mock DbAdapter, PLANNING_MOCK_ALLOWED for LLM tests"
   - id: product-outcomes
@@ -37,11 +37,13 @@ ttl_expires_on: null
 | `npm run test` | Run full suite once |
 | `npm run test:watch` | Watch mode |
 | `npm run test:coverage` | Coverage report (v8) |
-| `npm run test:planning` | Planning LLM tests (mock allowed) |
+| `npm run test:planning` | Narrow planning smoke suite with `PLANNING_MOCK_ALLOWED=1`; currently chat-stream mock + stream parser |
 | `npm run test:planning:e2e` | Planning E2E (trading card marketplace) |
-| `npm run test:e2e:project-to-cards` | Full flow: create project → idea → cards for 2+ workflows |
+| `npm run test:e2e` | Run all files under `__tests__/e2e/` |
+| `npm run test:e2e:project-to-cards` | Full flow: create project -> idea -> cards for 2+ workflows |
 | `npm run test:e2e:adaptive` | Adaptive E2E flows |
 | `npm run test:db` | DB adapter and migration tests |
+| `npm run test:examples` | Mock task example contracts |
 
 ---
 
@@ -50,18 +52,21 @@ ttl_expires_on: null
 ```
 __tests__/
 ├── setup.ts                 # @testing-library/jest-dom
+├── llm/                     # planning credential, SDK adapter, output/integration tests
 ├── lib/
 │   ├── mock-db-adapter.ts   # Shared mock DbAdapter
 │   ├── create-test-db.ts    # Test DB helpers
+│   ├── github/              # OAuth server and token resolution tests
 │   ├── memory/              # ingestion, retrieval, harvest, store, snapshots
-│   ├── llm/                 # stream-action-parser, planning fixtures
+│   ├── llm/                 # stream-action-parser, CLI auth branching
 │   └── ruvector-*           # RuVector client tests
 ├── components/              # workflow-block, activity-column, implementation-card, etc.
-├── api/                     # projects, map, actions, chat-stream, orchestration
+├── api/                     # projects, map, actions, chat-stream, orchestration, GitHub OAuth routes
 ├── mutations/               # apply-action, pipeline
-├── orchestration/           # create-run, trigger-build, approval-gates, etc.
+├── orchestration/           # create-run, trigger-build, approval-gates, repo manager, etc.
 ├── schemas/                 # slice-b, slice-c, core-planning
 ├── hooks/                   # use-submit-action, use-map-snapshot, etc.
+├── examples/                # mock task examples
 └── e2e/                     # project-to-cards-flow, adaptive-flows, trading-card-marketplace-planning
 ```
 
@@ -74,8 +79,18 @@ __tests__/
 - In-memory SQLite for integration tests via `createTestDb()` (when available)
 
 ### Planning LLM Tests
-- Set `PLANNING_MOCK_ALLOWED=1` to skip real API calls
-- Use `__tests__/llm/planning-fixtures.ts` for gold/adversarial examples
+- Set `PLANNING_MOCK_ALLOWED=1` for suites that intentionally avoid real API calls.
+- `npm run test:planning` is intentionally narrow; it does not cover the ADR 0016 auth router.
+- For planning auth/SDK routing, run:
+  ```bash
+  npm run test -- __tests__/llm/planning-credential.test.ts __tests__/llm/planning-credential.integration.test.ts __tests__/llm/planning-sdk-adapter.test.ts __tests__/lib/llm/claude-client-cli-auth.test.ts
+  ```
+- CLI fallback tests mock child process behavior or use `forceCliForTesting`; they should not require a real Claude CLI login.
+
+### GitHub OAuth and Token Tests
+- `__tests__/lib/github/oauth-server.test.ts` covers PKCE server helpers.
+- `__tests__/lib/github/resolve-github-token.test.ts` covers token precedence, including `DOSSIER_GITHUB_IGNORE_ENV`.
+- `__tests__/api/github-oauth-routes.test.ts` covers route-level behavior.
 
 ### Component Tests
 - `@testing-library/react`, `@testing-library/user-event`
