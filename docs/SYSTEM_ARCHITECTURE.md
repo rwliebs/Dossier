@@ -1,18 +1,18 @@
 ---
 document_id: doc.system-architecture
-last_verified: 2026-03-06
-tokens_estimate: 950
+last_verified: 2026-05-25
+tokens_estimate: 1150
 tags:
   - architecture
   - system
   - overview
 anchors:
   - id: overview
-    summary: "Desktop Next.js + Electron app; SQLite, agentic-flow, RuVector"
+    summary: "Desktop Next.js + Electron app; SQLite, Claude Agent SDK, RuVector"
   - id: data-model
     summary: "Project → Workflow → Activity → Card; knowledge items; orchestration entities"
   - id: data-flow
-    summary: "Chat → actions → SQLite; Build → clone → dispatch → feature branch"
+    summary: "Chat -> Agent SDK/CLI -> actions -> SQLite; Build -> clone -> dispatch -> feature branch"
   - id: boundaries
     summary: "Planning LLM cannot build; build agents cannot merge; humans gate all merges"
 ttl_expires_on: null
@@ -37,7 +37,7 @@ ttl_expires_on: null
 
 ## Overview
 
-Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stores all state locally. RuVector stores embeddings locally. Anthropic API provides LLM. Build agents run in-process via `@anthropic-ai/claude-agent-sdk`.
+Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stores all state locally. RuVector stores embeddings locally. Planning and build agents run through Anthropic via `@anthropic-ai/claude-agent-sdk`, with a Claude CLI fallback for planning when no extractable credential exists.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -73,7 +73,7 @@ Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stor
 | UI | React 19 + Tailwind v4 + shadcn/ui | `app/`, `components/` |
 | API | Next.js App Router (route handlers) | `app/api/` |
 | Database | SQLite via better-sqlite3 (local, no Supabase) | `lib/db/` |
-| Planning LLM | Anthropic Claude (streaming + non-streaming) | `lib/llm/` |
+| Planning LLM | Claude Agent SDK `query()` for credentialed users; Claude CLI fallback | `lib/llm/` |
 | Build agents | `@anthropic-ai/claude-agent-sdk` `query()` (streaming, in-process) | `lib/orchestration/` |
 | Agent definitions | agentic-flow registry (system prompts only) | `node_modules/agentic-flow/` |
 | Embeddings | all-MiniLM-L6-v2 (ONNX WASM, local) | `lib/memory/embedding.ts` |
@@ -106,7 +106,7 @@ Full schema details: [data-contracts-reference.md](domains/data-contracts-refere
 ## Data Flow (Summaries)
 
 ### Planning
-`User chat → Anthropic streaming API → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
+`User chat -> Agent SDK query() or Claude CLI fallback -> stream-action-parser -> PlanningAction[] -> validate -> apply -> SQLite`
 
 Detail: [planning-reference.md](domains/planning-reference.md)
 
@@ -138,14 +138,14 @@ Two distinct connection patterns exist.
 
 | Concern | Planning LLM | Build Agent |
 |---------|-------------|-------------|
-| Auth | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
-| SDK | `@anthropic-ai/sdk` (Messages API) | `@anthropic-ai/claude-agent-sdk` |
-| Call style | `messages.create` / `messages.stream` | `query()` — async iterator |
-| Streaming | Optional (non-streaming for simple calls, streaming for chat) | Always streaming (`for await` over messages) |
-| Tools | None (text output only) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
-| CWD | N/A | `worktree_path` (repo clone) |
-| Lifecycle | Request-response per chat turn | Fire-and-forget; result via in-process webhook callback |
-| Model | `claude-haiku-4-5-20251001` (configurable) | `claude-sonnet-4-5-20250929` (configurable) |
+| Auth | Credential from env, `~/.dossier/config`, or `~/.claude/settings.json`; CLI fallback only when no credential exists | `ANTHROPIC_API_KEY` |
+| SDK | `@anthropic-ai/claude-agent-sdk` for credentialed users | `@anthropic-ai/claude-agent-sdk` |
+| Call style | `query()` via `planning-sdk-runner.ts`; `claude -p` subprocess fallback | `query()` async iterator |
+| Streaming | Streaming endpoint yields final structured result chunks; non-streaming calls return final SDK result text | Always streaming (`for await` over messages) |
+| Tools | `WebSearch` always; `Read`, `Glob`, `Grep` only when a repo `cwd` is supplied | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
+| CWD | Optional cloned repo path for read-only planning inspection | `worktree_path` (repo clone) |
+| Lifecycle | Request-response per chat/finalize step; no persisted SDK session | Fire-and-forget; result via in-process webhook callback |
+| Model | `claude-haiku-4-5-20251001` (configurable; CLI fallback default is `claude-sonnet-4-6`) | `claude-sonnet-4-5-20250929` (configurable) |
 
 ---
 
@@ -158,7 +158,7 @@ Two distinct connection patterns exist.
 | `components/ui/` | shadcn/ui primitives |
 | `lib/actions/` | validate, apply, preview actions |
 | `lib/db/` | DbAdapter, SQLite adapter, migrations |
-| `lib/llm/` | Planning prompts, stream parser, skills |
+| `lib/llm/` | Planning prompts, credential resolution, Agent SDK runner, stream parser, skills |
 | `lib/orchestration/` | Build runs, assignments, dispatch, checks, approvals, PRs |
 | `lib/memory/` | Ingestion, retrieval, embedding, harvest |
 | `lib/ruvector/` | RuVector client (vector DB) |
@@ -196,6 +196,7 @@ Two distinct connection patterns exist.
 ## Verification
 - [ ] DbAdapter is single seam for all persistence
 - [ ] All map mutations go through actions pipeline
-- [ ] Planning vs Build boundaries enforced in prompts and validation
+- [ ] Planning vs Build boundaries enforced in prompts, tool allowlists, and validation
 - [ ] No Supabase, Postgres, or external DB references in source code
+- [ ] Planning uses Agent SDK for credentialed users and CLI only as no-credential fallback
 - [ ] Build agents use streaming SDK `query()`, not HTTP webhook from external service

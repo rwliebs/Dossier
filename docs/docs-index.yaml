@@ -6,17 +6,17 @@ docs_index:
   documents:
     - id: doc.system-architecture
       path: SYSTEM_ARCHITECTURE.md
-      tokens_estimate: 1200
+      tokens_estimate: 1150
       tags: [architecture, system, overview]
       anchors:
         - id: overview
-          summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
+          summary: "Desktop Next.js + Electron app; SQLite + Claude Agent SDK + RuVector"
         - id: data-flow
-          summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
+          summary: "Planning Agent SDK/CLI -> actions -> DbAdapter; Build -> orchestration -> agents"
         - id: endpoints
           summary: "REST API under /api/projects; map, actions, artifacts, cards"
       depends_on: []
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-25"
 
     - id: doc.data-contracts
       path: domains/data-contracts-reference.md
@@ -68,15 +68,17 @@ docs_index:
 
     - id: doc.planning
       path: domains/planning-reference.md
-      tokens_estimate: 700
+      tokens_estimate: 1100
       tags: [planning, llm, chat]
       anchors:
         - id: contract
           summary: "Planning LLM converts ideas to PlanningAction[]; never code-gen"
         - id: modes
-          summary: "Scaffold, populate, full; mode selected by map state"
+          summary: "Scaffold, populate, full, finalize; mode selected by map state"
+        - id: auth-and-tools
+          summary: "Credentialed planning uses Agent SDK; CLI fallback only without credentials"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-05-25"
 
     - id: doc.mutation
       path: domains/mutation-reference.md
@@ -116,15 +118,17 @@ docs_index:
 
     - id: doc.testing
       path: testing-reference.md
-      tokens_estimate: 900
+      tokens_estimate: 1050
       tags: [testing, vitest, quality]
       anchors:
         - id: commands
-          summary: "npm run test, test:watch, test:coverage"
+          summary: "npm run test, test:planning, test:e2e, test:examples, targeted Vitest paths"
+        - id: structure
+          summary: "Top-level llm tests plus lib/github, api, e2e, orchestration coverage"
         - id: ruvector-integration
           summary: "Temp dir isolation, 30s timeout, resetRuvectorForTesting"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-19"
+      last_verified: "2026-05-25"
 
     - id: doc.development
       path: development-reference.md
