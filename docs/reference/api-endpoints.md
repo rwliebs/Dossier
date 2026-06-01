@@ -214,11 +214,65 @@ Common statuses:
 
 ---
 
+## Planning Chat
+
+### POST /api/projects/[projectId]/chat
+
+Non-streaming planning endpoint. Validates the request, fetches the current map snapshot, runs planning, parses the final response, validates actions, and applies accepted actions.
+
+**Request body:**
+```json
+{
+  "message": "string",
+  "conversationHistory": [{ "role": "user|agent", "content": "string" }],
+  "mode": "scaffold|populate|finalize (optional)",
+  "workflow_id": "uuid (required when mode=populate)",
+  "mock_response": "string (test-only; requires PLANNING_MOCK_ALLOWED=1)"
+}
+```
+
+Behavior:
+- `mode=scaffold`: applies only `updateProject` and `createWorkflow`.
+- `mode=populate`: runs the two-phase populate flow for one workflow.
+- `mode=finalize`: creates required context artifacts and marks the project finalized.
+- No `mode`: empty maps scaffold; maps with structure use the full planning prompt. If workflows are empty and the message explicitly asks to populate, the endpoint populates those workflows.
+
+**Response:** `200`
+```json
+{
+  "status": "success",
+  "responseType": "clarification|actions|mixed",
+  "message": "string",
+  "applied": 3,
+  "workflow_ids_created": ["uuid"],
+  "workflow_id": "uuid",
+  "artifacts_created": 5,
+  "errors": [{ "action_type": "updateCard", "reason": "string" }]
+}
+```
+
+### POST /api/projects/[projectId]/chat/stream
+
+Streaming planning endpoint. Returns Server-Sent Events while parsing and applying actions.
+
+**Request body:** same as `/chat`, except `conversationHistory` is not accepted and `mode` defaults to `scaffold`.
+
+**SSE events:**
+- `message`: chat copy emitted by the planner.
+- `action`: an applied planning action and apply result.
+- `error`: rejected action or sub-step failure.
+- `phase_complete`: scaffold/populate/finalize completion metadata.
+- `done`: stream finished.
+
+Planning auth uses the Agent SDK for resolved credentials and falls back to `claude -p` only when no credential is extractable and the CLI is available. See [planning-reference.md](../domains/planning-reference.md).
+
+---
+
 ## Map & Actions
 
 ### GET /api/projects/[projectId]/map
 
-Canonical map snapshot: Workflow → WorkflowActivity → Step → Card tree.
+Canonical map snapshot: Workflow → WorkflowActivity → Card tree.
 
 **Response:** `200`
 ```json
@@ -230,8 +284,13 @@ Canonical map snapshot: Workflow → WorkflowActivity → Step → Card tree.
       "activities": [
         {
           "id", "workflow_id", "title", "color", "position",
-          "steps": [{ "id", "title", "position", "cards": [...] }],
-          "cards": []
+          "cards": [
+            {
+              "id", "workflow_activity_id", "title", "description", "status",
+              "priority", "quick_answer", "finalized_at", "build_state",
+              "last_built_at", "last_build_ref", "last_build_error"
+            }
+          ]
         }
       ]
     }
@@ -255,7 +314,7 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
   "actions": [
     {
       "id": "uuid (optional)",
-      "action_type": "createWorkflow|createActivity|createStep|createCard|updateCard|reorderCard|linkContextArtifact|upsertCardPlannedFile|approveCardPlannedFile|upsertCardKnowledgeItem|setCardKnowledgeStatus",
+      "action_type": "updateProject|createWorkflow|createActivity|createCard|updateCard|reorderCard|deleteWorkflow|deleteActivity|deleteCard|linkContextArtifact|createContextArtifact|upsertCardPlannedFile|upsertCardKnowledgeItem",
       "target_ref": {},
       "payload": {}
     }
@@ -269,17 +328,19 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
 
 | Action | Description |
 |--------|-------------|
+| `updateProject` | Update project metadata |
 | `createWorkflow` | Create a new workflow in the project |
 | `createActivity` | Create a workflow activity |
-| `createStep` | Create a step within an activity |
-| `createCard` | Create a card in a step or activity |
+| `createCard` | Create a card in an activity |
 | `updateCard` | Update card title, description, status, or priority |
-| `reorderCard` | Move card to new step/position |
+| `reorderCard` | Move card to a new position |
+| `deleteWorkflow` | Delete a workflow and cascaded activities/cards |
+| `deleteActivity` | Delete an activity and cascaded cards |
+| `deleteCard` | Delete a card |
 | `linkContextArtifact` | Link a context artifact to a card |
+| `createContextArtifact` | Create a project context artifact, optionally linked to a card |
 | `upsertCardPlannedFile` | Create or update a planned file for a card |
-| `approveCardPlannedFile` | Approve or revert a planned file |
 | `upsertCardKnowledgeItem` | Create or update a requirement, fact, assumption, or question |
-| `setCardKnowledgeStatus` | Set status (draft/approved/rejected) on a knowledge item |
 
 Code-generation intents are rejected.
 
@@ -403,6 +464,60 @@ Update or approve planned file. Use `{ "status": "approved" }` for approval.
 ### DELETE /api/projects/[projectId]/cards/[cardId]/planned-files/[fileId]
 
 Delete planned file.
+
+---
+
+## Card Context, Finalization, Produced Files, and Push
+
+### GET /api/projects/[projectId]/cards/[cardId]/context-artifacts
+
+List context artifacts linked to a card. Returns `404` if the card does not belong to the project.
+
+### GET /api/projects/[projectId]/cards/[cardId]/finalize
+
+Assemble the finalization package for review: the card, project docs (`doc|spec|design`), linked card artifacts, requirements, planned files, and current `finalized_at`.
+
+### POST /api/projects/[projectId]/cards/[cardId]/finalize
+
+Streaming SSE endpoint that approves a card.
+
+Constraints:
+- Project must already be finalized.
+- Card must have at least one requirement.
+- Card must have at least one planned file or folder.
+- Planning LLM must be enabled.
+
+Behavior:
+- Links project-wide context docs to the card.
+- Generates an e2e test context artifact via the planning sub-step.
+- Sets `card.finalized_at`.
+- Ingests card context into memory when the memory plane is enabled.
+
+**SSE events:** `finalize_progress`, `action`, `error`, `phase_complete`, `done`.
+
+### GET /api/projects/[projectId]/cards/[cardId]/produced-files
+
+Returns files added or modified by the most recent completed assignment for the card.
+
+**Response:** `200`
+```json
+[
+  { "path": "src/index.ts", "status": "added" }
+]
+```
+
+Returns `[]` when no completed build with a worktree is available.
+
+### POST /api/projects/[projectId]/cards/[cardId]/push
+
+Pushes the card's completed feature branch from the local clone to the connected GitHub repository. The user still opens and merges the pull request in GitHub.
+
+Common statuses:
+- `200` `{ "success": true, "branch": "feature/card-..." }`
+- `400` project has no connected repository
+- `401` GitHub token missing or invalid
+- `409` no completed build for the card
+- `502` git push failed
 
 ---
 

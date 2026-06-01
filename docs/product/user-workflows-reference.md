@@ -1,6 +1,6 @@
 ---
 document_id: doc.user-workflows
-last_verified: 2026-03-28
+last_verified: 2026-06-01
 tokens_estimate: 1200
 tags:
   - ux
@@ -22,7 +22,7 @@ ttl_expires_on: null
 ## Contract
 
 ### Invariants
-- INVARIANT: Map structure is Workflow → Activity → Step → Card; all mutations via PlanningAction
+- INVARIANT: Map structure is Workflow → Activity → Card; all mutations via PlanningAction
 - INVARIANT: Build cannot trigger without finalized cards (planned files or folders are required; user must approve at least one per card before finalization. For new builds, the agent may propose folder paths (e.g. components/auth/) where files should go.)
 - INVARIANT: Project must be finalized before cards can be finalized
 - INVARIANT: Build cannot trigger without card.finalized_at set (card finalization confirmed)

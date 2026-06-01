@@ -10,13 +10,13 @@ docs_index:
       tags: [architecture, system, overview]
       anchors:
         - id: overview
-          summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
+          summary: "Desktop Next.js app; SQLite + Agent SDK planning/build + RuVector"
         - id: data-flow
-          summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
+          summary: "Planning Agent SDK/CLI → actions → SQLite; Build → orchestration → agents"
         - id: endpoints
-          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+          summary: "REST API under /api; setup, GitHub, chat, map, actions, artifacts, cards, orchestration"
       depends_on: []
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-01"
 
     - id: doc.data-contracts
       path: domains/data-contracts-reference.md
@@ -26,11 +26,11 @@ docs_index:
         - id: contract
           summary: "Zod schemas in lib/schemas/; slice-a/b/c + action-payloads"
         - id: core-entities
-          summary: "Project, Workflow, WorkflowActivity, Step, Card hierarchy"
+          summary: "Project, Workflow, WorkflowActivity, Card hierarchy"
         - id: actions
           summary: "PlanningAction payloads and target_ref per action_type"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-01"
 
     - id: doc.design-system
       path: design/design-system.md
@@ -54,7 +54,7 @@ docs_index:
         - id: workflow-c
           summary: "Build trigger to draft PR: agents, checks, approval"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-01"
 
     - id: doc.api-reference
       path: domains/api-reference.md
@@ -62,9 +62,9 @@ docs_index:
       tags: [api, endpoints]
       anchors:
         - id: endpoints
-          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+          summary: "REST API under /api; setup, GitHub, chat, map, actions, artifacts, cards, orchestration"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-01"
 
     - id: doc.planning
       path: domains/planning-reference.md
@@ -75,8 +75,10 @@ docs_index:
           summary: "Planning LLM converts ideas to PlanningAction[]; never code-gen"
         - id: modes
           summary: "Scaffold, populate, full; mode selected by map state"
+        - id: flow
+          summary: "Chat → Agent SDK or Claude CLI → parser → actions"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-01"
 
     - id: doc.mutation
       path: domains/mutation-reference.md
@@ -96,11 +98,11 @@ docs_index:
       tags: [map, snapshot, story-map]
       anchors:
         - id: contract
-          summary: "Map = Project + Workflow→Activity→Step→Card tree; PlanningState"
+          summary: "Map = Project + Workflow→Activity→Card tree; PlanningState"
         - id: build
-          summary: "fetchMapSnapshot → PlanningState; buildMapTree → API response"
+          summary: "GET /map batched queries → Workflow→Activity→Card API response"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-01"
 
     - id: doc.orchestration
       path: domains/orchestration-reference.md
@@ -124,7 +126,7 @@ docs_index:
         - id: ruvector-integration
           summary: "Temp dir isolation, 30s timeout, resetRuvectorForTesting"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-19"
+      last_verified: "2026-06-01"
 
     - id: doc.development
       path: development-reference.md
@@ -152,9 +154,9 @@ docs_index:
       tags: [configuration, env]
       anchors:
         - id: precedence
-          summary: "process.env > .env.local > ~/.dossier/config"
+          summary: "process.env/.env.local > ~/.dossier/config > Claude Code settings/CLI"
       depends_on: [doc.development]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-01"
 
     - id: doc.memory
       path: domains/memory-reference.md

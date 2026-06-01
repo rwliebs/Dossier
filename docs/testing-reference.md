@@ -1,7 +1,7 @@
 ---
 document_id: doc.testing
-last_verified: 2026-02-19
-tokens_estimate: 900
+last_verified: 2026-06-01
+tokens_estimate: 1050
 tags:
   - testing
   - vitest
@@ -54,10 +54,10 @@ __tests__/
 │   ├── mock-db-adapter.ts   # Shared mock DbAdapter
 │   ├── create-test-db.ts    # Test DB helpers
 │   ├── memory/              # ingestion, retrieval, harvest, store, snapshots
-│   ├── llm/                 # stream-action-parser, planning fixtures
+│   ├── llm/                 # stream-action-parser, planning fixtures, credential/Agent SDK tests
 │   └── ruvector-*           # RuVector client tests
 ├── components/              # workflow-block, activity-column, implementation-card, etc.
-├── api/                     # projects, map, actions, chat-stream, orchestration
+├── api/                     # projects, map, actions, chat-stream, GitHub OAuth, orchestration, dev utilities
 ├── mutations/               # apply-action, pipeline
 ├── orchestration/           # create-run, trigger-build, approval-gates, etc.
 ├── schemas/                 # slice-b, slice-c, core-planning
@@ -76,6 +76,15 @@ __tests__/
 ### Planning LLM Tests
 - Set `PLANNING_MOCK_ALLOWED=1` to skip real API calls
 - Use `__tests__/llm/planning-fixtures.ts` for gold/adversarial examples
+- Credential routing coverage:
+  - `__tests__/llm/planning-credential.test.ts`
+  - `__tests__/llm/planning-credential.integration.test.ts`
+  - `__tests__/llm/planning-sdk-adapter.test.ts`
+  - `__tests__/lib/llm/claude-client-cli-auth.test.ts`
+  - `__tests__/setup/credential-oauth.test.ts`
+- GitHub and local dev utility API coverage:
+  - `__tests__/api/github-oauth-routes.test.ts`
+  - `__tests__/api/restart-and-open.test.ts`
 
 ### Component Tests
 - `@testing-library/react`, `@testing-library/user-event`
