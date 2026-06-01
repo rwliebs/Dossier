@@ -1,7 +1,7 @@
 ---
 document_id: doc.configuration
-last_verified: 2026-02-18
-tokens_estimate: 600
+last_verified: 2026-06-01
+tokens_estimate: 750
 tags:
   - configuration
   - env
@@ -23,17 +23,19 @@ ttl_expires_on: null
 
 - INVARIANT: Config precedence: `process.env` > `.env.local` > `~/.dossier/config`
 - INVARIANT: Self-deploy uses `~/.dossier/config`; dev uses `.env.local`
-- Anthropic credential: we accept **API key** first (env, then `~/.dossier/config`). If none is set, we use your **installed Claude CLI** config: `~/.claude/settings.json` (or `CLAUDE_CONFIG_DIR`/settings.json). We read `env.ANTHROPIC_API_KEY` or `env.ANTHROPIC_AUTH_TOKEN` from that file so you don’t need to paste a key if Claude Code is already configured.
+- Anthropic credential: we accept **API key** first (env, then `~/.dossier/config`). If none is set, we read your **Claude Code** settings file: `~/.claude/settings.json` (or `CLAUDE_CONFIG_DIR`/settings.json). We read `env.ANTHROPIC_API_KEY` or `env.ANTHROPIC_AUTH_TOKEN`; OAuth tokens are exported to `CLAUDE_CODE_OAUTH_TOKEN` for the Agent SDK.
+- If no Anthropic credential is extractable but the `claude` binary is installed and authenticated, planning can fall back to `claude -p`. Setup status treats that as Anthropic configured.
 
 ---
 
 ## Required
 
-Anthropic credential (API key or Claude CLI config) and GitHub token:
+Anthropic access (API key, Claude Code settings credential, or authenticated Claude CLI fallback) and GitHub token:
 
 | Variable | Purpose |
 |----------|---------|
-| ANTHROPIC_API_KEY | Planning LLM and build (set in env or `~/.dossier/config`; or we use your Claude CLI `~/.claude/settings.json` when no key is set) |
+| ANTHROPIC_API_KEY | Planning LLM and build (set in env or `~/.dossier/config`; or read from Claude Code `~/.claude/settings.json` when no key is set) |
+| CLAUDE_CODE_OAUTH_TOKEN | Usually not hand-set. When `~/.claude/settings.json` contains `env.ANTHROPIC_AUTH_TOKEN`, Dossier mirrors it here so Agent SDK planning can use OAuth/Max credentials. |
 | GITHUB_TOKEN | Push branches, list/create repos, HTTPS git; classic PAT from [tokens](https://github.com/settings/tokens) (`repo` scope), or written by **Connect GitHub** OAuth into `~/.dossier/config` |
 
 ### GitHub OAuth (local / desktop)

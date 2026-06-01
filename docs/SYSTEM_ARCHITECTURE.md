@@ -1,7 +1,7 @@
 ---
 document_id: doc.system-architecture
-last_verified: 2026-03-06
-tokens_estimate: 950
+last_verified: 2026-06-01
+tokens_estimate: 1150
 tags:
   - architecture
   - system
@@ -37,7 +37,7 @@ ttl_expires_on: null
 
 ## Overview
 
-Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stores all state locally. RuVector stores embeddings locally. Anthropic API provides LLM. Build agents run in-process via `@anthropic-ai/claude-agent-sdk`.
+Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stores all state locally. RuVector stores embeddings locally. Planning and build agents use Claude; credentialed planning and all build execution run through `@anthropic-ai/claude-agent-sdk`.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -73,7 +73,7 @@ Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stor
 | UI | React 19 + Tailwind v4 + shadcn/ui | `app/`, `components/` |
 | API | Next.js App Router (route handlers) | `app/api/` |
 | Database | SQLite via better-sqlite3 (local, no Supabase) | `lib/db/` |
-| Planning LLM | Anthropic Claude (streaming + non-streaming) | `lib/llm/` |
+| Planning LLM | Claude Agent SDK `query()` for credentialed users; `claude -p` fallback when only CLI auth exists | `lib/llm/` |
 | Build agents | `@anthropic-ai/claude-agent-sdk` `query()` (streaming, in-process) | `lib/orchestration/` |
 | Agent definitions | agentic-flow registry (system prompts only) | `node_modules/agentic-flow/` |
 | Embeddings | all-MiniLM-L6-v2 (ONNX WASM, local) | `lib/memory/embedding.ts` |
@@ -106,12 +106,12 @@ Full schema details: [data-contracts-reference.md](domains/data-contracts-refere
 ## Data Flow (Summaries)
 
 ### Planning
-`User chat → Anthropic streaming API → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
+`User chat → Agent SDK query() or claude -p fallback → parser → PlanningAction[] → validate → apply → SQLite`
 
 Detail: [planning-reference.md](domains/planning-reference.md)
 
 ### Map
-`GET /map → fetchMapSnapshot → PlanningState → buildMapTree → nested JSON for UI`
+`GET /map → getProject + getWorkflowsByProject + getActivitiesByProject + getCardsByProject → Workflow → Activity → Card JSON for UI`
 
 Detail: [map-reference.md](domains/map-reference.md)
 
@@ -138,14 +138,16 @@ Two distinct connection patterns exist.
 
 | Concern | Planning LLM | Build Agent |
 |---------|-------------|-------------|
-| Auth | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
-| SDK | `@anthropic-ai/sdk` (Messages API) | `@anthropic-ai/claude-agent-sdk` |
-| Call style | `messages.create` / `messages.stream` | `query()` — async iterator |
-| Streaming | Optional (non-streaming for simple calls, streaming for chat) | Always streaming (`for await` over messages) |
-| Tools | None (text output only) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
-| CWD | N/A | `worktree_path` (repo clone) |
-| Lifecycle | Request-response per chat turn | Fire-and-forget; result via in-process webhook callback |
-| Model | `claude-haiku-4-5-20251001` (configurable) | `claude-sonnet-4-5-20250929` (configurable) |
+| Auth | `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`; `claude -p` fallback only when no extractable credential exists | `ANTHROPIC_API_KEY` / Agent SDK environment |
+| SDK | `@anthropic-ai/claude-agent-sdk`; fallback subprocess via Claude CLI | `@anthropic-ai/claude-agent-sdk` |
+| Call style | `query()` async iterator; CLI emits JSON / stream-json | `query()` async iterator |
+| Streaming | Optional: `POST /chat` waits for final text; `/chat/stream` streams parser input | Always streaming (`for await` over messages) |
+| Tools | WebSearch always; Read/Glob/Grep only when repo clone `cwd` exists; no write tools or Bash | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
+| CWD | Connected repo clone when available; otherwise omitted | `worktree_path` (repo clone) |
+| Lifecycle | Request-response per chat turn or planning sub-step | Fire-and-forget; result via in-process webhook callback |
+| Model | `claude-haiku-4-5-20251001` (configurable); CLI fallback default `claude-sonnet-4-6` | `claude-sonnet-4-5-20250929` (configurable) |
+
+Planning auth routing is captured in [ADR 0016](adr/0016-planning-agent-two-auth-paths.md). The older `@anthropic-ai/sdk` Messages API route is not part of the planning execution path.
 
 ---
 
