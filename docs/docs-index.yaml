@@ -6,31 +6,31 @@ docs_index:
   documents:
     - id: doc.system-architecture
       path: SYSTEM_ARCHITECTURE.md
-      tokens_estimate: 1200
+      tokens_estimate: 1050
       tags: [architecture, system, overview]
       anchors:
         - id: overview
           summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
         - id: data-flow
-          summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
+          summary: "Planning LLM → actions → SQLite; Build → orchestration → agents"
         - id: endpoints
           summary: "REST API under /api/projects; map, actions, artifacts, cards"
       depends_on: []
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-15"
 
     - id: doc.data-contracts
       path: domains/data-contracts-reference.md
-      tokens_estimate: 1800
+      tokens_estimate: 1850
       tags: [schemas, types, api, contracts]
       anchors:
         - id: contract
           summary: "Zod schemas in lib/schemas/; slice-a/b/c + action-payloads"
         - id: core-entities
-          summary: "Project, Workflow, WorkflowActivity, Step, Card hierarchy"
+          summary: "Project, Workflow, WorkflowActivity, Card hierarchy"
         - id: actions
           summary: "PlanningAction payloads and target_ref per action_type"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-15"
 
     - id: doc.design-system
       path: design/design-system.md
@@ -44,7 +44,7 @@ docs_index:
 
     - id: doc.user-workflows
       path: product/user-workflows-reference.md
-      tokens_estimate: 900
+      tokens_estimate: 1200
       tags: [ux, workflows, user-journey]
       anchors:
         - id: workflow-a
@@ -54,21 +54,21 @@ docs_index:
         - id: workflow-c
           summary: "Build trigger to draft PR: agents, checks, approval"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-15"
 
     - id: doc.api-reference
       path: domains/api-reference.md
-      tokens_estimate: 400
+      tokens_estimate: 550
       tags: [api, endpoints]
       anchors:
         - id: endpoints
-          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+          summary: "REST API groups: setup, GitHub, map, actions, chat, cards, orchestration"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-15"
 
     - id: doc.planning
       path: domains/planning-reference.md
-      tokens_estimate: 700
+      tokens_estimate: 900
       tags: [planning, llm, chat]
       anchors:
         - id: contract
@@ -76,11 +76,11 @@ docs_index:
         - id: modes
           summary: "Scaffold, populate, full; mode selected by map state"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-15"
 
     - id: doc.mutation
       path: domains/mutation-reference.md
-      tokens_estimate: 650
+      tokens_estimate: 800
       tags: [mutation, actions, pipeline]
       anchors:
         - id: contract
@@ -88,19 +88,19 @@ docs_index:
         - id: pipeline
           summary: "validate-action → apply-action; idempotency via key"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-15"
 
     - id: doc.map
       path: domains/map-reference.md
-      tokens_estimate: 550
+      tokens_estimate: 650
       tags: [map, snapshot, story-map]
       anchors:
         - id: contract
-          summary: "Map = Project + Workflow→Activity→Step→Card tree; PlanningState"
+          summary: "Map = Project + Workflow→Activity→Card tree; PlanningState"
         - id: build
-          summary: "fetchMapSnapshot → PlanningState; buildMapTree → API response"
+          summary: "GET /map batches project/workflow/activity/card queries into nested response"
       depends_on: [doc.system-architecture, doc.data-contracts]
-      last_verified: "2026-02-18"
+      last_verified: "2026-06-15"
 
     - id: doc.orchestration
       path: domains/orchestration-reference.md
@@ -179,6 +179,16 @@ docs_index:
           summary: "Three channels: npm publish, CLI entry, Electron desktop app"
       depends_on: []
       last_verified: "2026-03-06"
+
+    - id: doc.planning-agent-auth-paths
+      path: adr/0016-planning-agent-two-auth-paths.md
+      tokens_estimate: 650
+      tags: [planning, llm, auth, adr]
+      anchors:
+        - id: decision
+          summary: "Credentialed planning uses Agent SDK; Claude CLI remains fallback"
+      depends_on: [doc.planning]
+      last_verified: "2026-06-15"
 
     - id: doc.desktop-build-distribution
       path: reference/desktop-build-and-distribution.md

@@ -1,7 +1,7 @@
 ---
 document_id: doc.system-architecture
-last_verified: 2026-03-06
-tokens_estimate: 950
+last_verified: 2026-06-15
+tokens_estimate: 1050
 tags:
   - architecture
   - system
@@ -37,13 +37,13 @@ ttl_expires_on: null
 
 ## Overview
 
-Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stores all state locally. RuVector stores embeddings locally. Anthropic API provides LLM. Build agents run in-process via `@anthropic-ai/claude-agent-sdk`.
+Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stores all state locally. RuVector stores embeddings locally. Planning uses the Claude Agent SDK for credentialed users, with Claude CLI fallback when no credential is extractable. Build agents run in-process via `@anthropic-ai/claude-agent-sdk`.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Electron Shell                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  Next.js 15 (standalone)                              │   │
+│  │  Next.js 16 (standalone)                              │   │
 │  │  ┌──────────┐  ┌──────────┐  ┌───────────────────┐   │   │
 │  │  │ React 19 │  │ API      │  │ Claude Agent SDK  │   │   │
 │  │  │ UI       │──│ Routes   │──│ (in-process,      │   │   │
@@ -73,7 +73,7 @@ Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stor
 | UI | React 19 + Tailwind v4 + shadcn/ui | `app/`, `components/` |
 | API | Next.js App Router (route handlers) | `app/api/` |
 | Database | SQLite via better-sqlite3 (local, no Supabase) | `lib/db/` |
-| Planning LLM | Anthropic Claude (streaming + non-streaming) | `lib/llm/` |
+| Planning LLM | Claude Agent SDK `query()` or Claude CLI fallback (streaming + non-streaming) | `lib/llm/` |
 | Build agents | `@anthropic-ai/claude-agent-sdk` `query()` (streaming, in-process) | `lib/orchestration/` |
 | Agent definitions | agentic-flow registry (system prompts only) | `node_modules/agentic-flow/` |
 | Embeddings | all-MiniLM-L6-v2 (ONNX WASM, local) | `lib/memory/embedding.ts` |
@@ -106,12 +106,12 @@ Full schema details: [data-contracts-reference.md](domains/data-contracts-refere
 ## Data Flow (Summaries)
 
 ### Planning
-`User chat → Anthropic streaming API → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
+`User chat → claude-client → Agent SDK query() or Claude CLI fallback → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
 
 Detail: [planning-reference.md](domains/planning-reference.md)
 
 ### Map
-`GET /map → fetchMapSnapshot → PlanningState → buildMapTree → nested JSON for UI`
+`GET /map → getProject + workflows + activities + cards → group by workflow/activity → nested JSON for UI`
 
 Detail: [map-reference.md](domains/map-reference.md)
 
@@ -138,14 +138,14 @@ Two distinct connection patterns exist.
 
 | Concern | Planning LLM | Build Agent |
 |---------|-------------|-------------|
-| Auth | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
-| SDK | `@anthropic-ai/sdk` (Messages API) | `@anthropic-ai/claude-agent-sdk` |
-| Call style | `messages.create` / `messages.stream` | `query()` — async iterator |
+| Auth | `ANTHROPIC_API_KEY`, OAuth token, or Claude CLI auth fallback | `ANTHROPIC_API_KEY` |
+| SDK | `@anthropic-ai/claude-agent-sdk` for credentials; `claude -p` fallback | `@anthropic-ai/claude-agent-sdk` |
+| Call style | `query()` for credentials; CLI subprocess fallback | `query()` — async iterator |
 | Streaming | Optional (non-streaming for simple calls, streaming for chat) | Always streaming (`for await` over messages) |
-| Tools | None (text output only) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
-| CWD | N/A | `worktree_path` (repo clone) |
+| Tools | Agent SDK path: `WebSearch`; plus `Read`, `Glob`, `Grep` when repo cwd is available | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
+| CWD | Connected repo clone when available; otherwise none | `worktree_path` (repo clone) |
 | Lifecycle | Request-response per chat turn | Fire-and-forget; result via in-process webhook callback |
-| Model | `claude-haiku-4-5-20251001` (configurable) | `claude-sonnet-4-5-20250929` (configurable) |
+| Model | `claude-haiku-4-5-20251001` for Agent SDK; `claude-sonnet-4-6` CLI default; configurable | `claude-sonnet-4-5-20250929` (configurable) |
 
 ---
 

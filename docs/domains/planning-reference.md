@@ -1,7 +1,7 @@
 ---
 document_id: doc.planning
-last_verified: 2026-03-06
-tokens_estimate: 750
+last_verified: 2026-06-15
+tokens_estimate: 900
 tags:
   - planning
   - llm
@@ -12,7 +12,7 @@ anchors:
   - id: modes
     summary: "Scaffold, populate, full; mode selected by map state"
   - id: flow
-    summary: "Chat → Claude → stream-action-parser → actions"
+    summary: "Chat → Agent SDK or CLI fallback → stream-action-parser → actions"
 ttl_expires_on: null
 ---
 # Planning Domain Reference
@@ -39,7 +39,7 @@ ttl_expires_on: null
 | Mode | When | Output |
 |------|------|--------|
 | scaffold | Map empty or no workflows | updateProject + createWorkflow only |
-| populate | Workflows exist, activities/cards sparse | createActivity, createStep, createCard |
+| populate | Workflows exist, activities/cards sparse | createActivity, createCard |
 | full | Map has structure | All action types; refinements, links, planned files |
 | finalize | Map fully planned; user triggers | createContextArtifact (project docs + card e2e tests) |
 
@@ -49,20 +49,34 @@ Mode selected by `lib/llm/planning-prompt.ts` based on map state.
 ```
 User message → POST /chat/stream
   → buildPlanningSystemPrompt() | buildScaffoldSystemPrompt() | buildPopulateSystemPrompt() | buildFinalizeSystemPrompt()
-  → Claude API (streaming)
+  → claude-client.ts
+      → credential found: Agent SDK query() via planning-sdk-runner.ts
+      → no credential + Claude CLI available: claude -p fallback
   → stream-action-parser (parse JSON blocks)
   → PlanningAction[] emitted
   → POST /actions (validate + apply)
 ```
 
+Credentialed planning always uses `@anthropic-ai/claude-agent-sdk` `query()`.
+Tool availability is based on repository context:
+- Repo connected (`cwd` provided): `Read`, `Glob`, `Grep`, `WebSearch`
+- No repo context: `WebSearch`
+- CLI fallback has no managed read tools; it receives the system prompt and user message via stdin.
+
 ### Per-Card Finalize Flow
 ```
-User clicks "Finalize" on card → POST /cards/[cardId]/finalize
-  → Assemble: project-wide docs + card context + e2e tests
+User opens finalize panel → GET /cards/[cardId]/finalize
+  → Assemble: project-wide docs + linked card context + requirements + planned files
   → Return finalization package for review
-  → User edits (optional)
-  → POST /cards/[cardId]/finalize/confirm
+
+User clicks "Finalize" on card → POST /cards/[cardId]/finalize
+  → Validate project.finalized_at
+  → Validate card has at least one requirement
+  → Validate card has at least one planned file/folder
+  → Link project-wide docs to the card
+  → Generate e2e test artifact via LLM when planning LLM is enabled
   → Set card.finalized_at → card is build-ready
+  → Stream SSE events: finalize_progress, action, error, done
 ```
 
 ### Key Files
@@ -71,7 +85,8 @@ User clicks "Finalize" on card → POST /cards/[cardId]/finalize
 | `lib/llm/planning-prompt.ts` | System prompts; mode selection |
 | `lib/llm/stream-action-parser.ts` | Parse streaming JSON → actions |
 | `lib/llm/build-preview-response.ts` | Preview response before apply |
-| `lib/llm/claude-client.ts` | Planning LLM client (Messages API) |
+| `lib/llm/claude-client.ts` | Planning LLM routing: Agent SDK for credentials; Claude CLI fallback |
+| `lib/llm/planning-sdk-runner.ts` | Agent SDK `query()` wrapper and read-only planning tool policy |
 | `lib/llm/planning-credential.ts` | Resolves ANTHROPIC_API_KEY from env or ~/.dossier/config |
 | `app/api/projects/[id]/chat/route.ts` | Non-streaming chat |
 | `app/api/projects/[id]/chat/stream/route.ts` | Streaming chat (scaffold, populate, finalize) |
