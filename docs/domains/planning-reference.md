@@ -1,6 +1,6 @@
 ---
 document_id: doc.planning
-last_verified: 2026-03-06
+last_verified: 2026-04-13
 tokens_estimate: 750
 tags:
   - planning
@@ -57,13 +57,21 @@ User message → POST /chat/stream
 
 ### Per-Card Finalize Flow
 ```
-User clicks "Finalize" on card → POST /cards/[cardId]/finalize
-  → Assemble: project-wide docs + card context + e2e tests
-  → Return finalization package for review
-  → User edits (optional)
-  → POST /cards/[cardId]/finalize/confirm
-  → Set card.finalized_at → card is build-ready
+User opens finalize panel → GET /cards/[cardId]/finalize
+  → Return package: card + project_docs + card_artifacts + requirements + planned_files
+User confirms finalize → POST /cards/[cardId]/finalize (SSE)
+  → link_docs step: link project doc/spec/design artifacts to card
+  → test_gen step: generate e2e test/context artifact actions via LLM
+  → confirm step: set card.finalized_at, optionally ingest memory context
+  → Emit done
 ```
+
+Per-card finalize preconditions (enforced by route):
+- project must already be approved (`project.finalized_at` exists)
+- card must contain at least one requirement
+- card must contain at least one planned file/folder
+- card must not already be finalized
+- planning LLM flag must be enabled
 
 ### Key Files
 | File | Purpose |
