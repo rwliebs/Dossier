@@ -1,7 +1,7 @@
 ---
 document_id: doc.data-contracts
-last_verified: 2026-02-18
-tokens_estimate: 1800
+last_verified: 2026-06-15
+tokens_estimate: 1850
 tags:
   - schemas
   - types
@@ -11,7 +11,7 @@ anchors:
   - id: contract
     summary: "Zod schemas in lib/schemas/; slice-a/b/c + action-payloads"
   - id: core-entities
-    summary: "Project, Workflow, WorkflowActivity, Step, Card hierarchy"
+    summary: "Project, Workflow, WorkflowActivity, Card hierarchy"
   - id: card-context
     summary: "ContextArtifact, CardPlannedFile, knowledge items"
   - id: actions
@@ -53,9 +53,7 @@ ttl_expires_on: null
 Project
   └── Workflow[] (position-ordered)
         └── WorkflowActivity[] (position-ordered)
-              ├── Step[] (position-ordered)
-              │     └── Card[] (step_id or activity-level)
-              └── Card[] (activity-level, no step)
+              └── Card[] (position/priority-ordered)
 ```
 
 ### Project
@@ -91,13 +89,13 @@ Project
 |-------|------|-------|
 | id | uuid | |
 | workflow_activity_id | uuid | |
-| step_id | uuid \| null | optional, for step-scoped cards |
 | title | string (min 1) | |
 | description | string \| null | optional |
 | status | enum | todo\|active\|questions\|review\|production |
 | priority | int | |
 | position | int | |
 | quick_answer | string \| null | optional |
+| finalized_at | datetime \| null | set by card finalization endpoint |
 
 ---
 
@@ -147,18 +145,23 @@ All actions: `{ id, project_id, action_type, target_ref, payload }`
 
 | action_type | target_ref | payload |
 |-------------|------------|---------|
-| updateProject | `{ project_id }` | `{ name?, description? }` |
+| updateProject | `{ project_id }` | `{ name?, description?, customer_personas?, tech_stack?, deployment?, design_inspiration? }` |
 | createWorkflow | `{ project_id }` | `{ title, description?, position }` |
 | createActivity | `{ workflow_id }` | `{ title, color?, position }` |
 | createCard | `{ workflow_activity_id }` | `{ title, description?, status, priority, position }` |
 | updateCard | `{ card_id }` | `{ title?, description?, status?, priority?, quick_answer? }` |
 | reorderCard | `{ card_id }` | `{ new_position }` |
+| deleteWorkflow | `{ workflow_id }` | `{}` |
+| deleteActivity | `{ workflow_activity_id }` | `{}` |
+| deleteCard | `{ card_id }` | `{}` |
 | linkContextArtifact | `{ card_id }` | `{ context_artifact_id, linked_by?, usage_hint? }` |
 | createContextArtifact | `{ project_id }` | `{ name, type, title?, content, card_id? }` |
 | upsertCardPlannedFile | `{ card_id }` | `{ logical_file_name, artifact_kind, action, intent_summary, contract_notes?, position, planned_file_id? }` |
-| approveCardPlannedFile | `{ card_id }` | `{ planned_file_id, status: "approved"\|"proposed" }` |
 | upsertCardKnowledgeItem | `{ card_id }` | `{ item_type, text, evidence_source?, confidence?, position, knowledge_item_id? }` |
-| setCardKnowledgeStatus | `{ card_id }` | `{ knowledge_item_id, status }` |
+
+Notes:
+- Planned-file approval is a card planned-file REST update (`PATCH /api/projects/[projectId]/cards/[cardId]/planned-files/[fileId]`), not a PlanningAction.
+- Knowledge-item status changes are handled by the relevant knowledge-item REST routes, not a PlanningAction.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 document_id: doc.mutation
-last_verified: 2026-02-18
-tokens_estimate: 650
+last_verified: 2026-06-15
+tokens_estimate: 800
 tags:
   - mutation
   - actions
@@ -51,6 +51,23 @@ PlanningAction[] → validateAction() → [errors] | []
 - Load PlanningState from DB (or reconstruct from actions)
 - For each action: validate against state → mutate state → persist via adapter
 - Increment project action_sequence on success
+
+### PlanningAction Inventory
+
+Map/planning mutations accepted by `lib/schemas/slice-a.ts` and applied by `lib/db/mutations.ts`:
+
+| Category | Action types |
+|----------|--------------|
+| Project | `updateProject` |
+| Map create/update | `createWorkflow`, `createActivity`, `createCard`, `updateCard`, `reorderCard` |
+| Map delete | `deleteWorkflow`, `deleteActivity`, `deleteCard` |
+| Context | `createContextArtifact`, `linkContextArtifact` |
+| Card planning | `upsertCardPlannedFile`, `upsertCardKnowledgeItem` |
+
+Non-actions:
+- Planned-file approval uses `PATCH /api/projects/[projectId]/cards/[cardId]/planned-files/[fileId]`.
+- Knowledge-item status edits use the specific requirements/facts/assumptions/questions routes.
+- The Step layer is removed; no mutation path should emit `createStep` or target `step_id`.
 
 ### Key Files
 | File | Purpose |

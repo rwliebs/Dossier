@@ -218,7 +218,7 @@ Common statuses:
 
 ### GET /api/projects/[projectId]/map
 
-Canonical map snapshot: Workflow → WorkflowActivity → Step → Card tree.
+Canonical UI map snapshot: Workflow → WorkflowActivity → Card tree.
 
 **Response:** `200`
 ```json
@@ -230,8 +230,9 @@ Canonical map snapshot: Workflow → WorkflowActivity → Step → Card tree.
       "activities": [
         {
           "id", "workflow_id", "title", "color", "position",
-          "steps": [{ "id", "title", "position", "cards": [...] }],
-          "cards": []
+          "cards": [
+            { "id", "workflow_activity_id", "title", "status", "priority", "build_state" }
+          ]
         }
       ]
     }
@@ -255,7 +256,7 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
   "actions": [
     {
       "id": "uuid (optional)",
-      "action_type": "createWorkflow|createActivity|createStep|createCard|updateCard|reorderCard|linkContextArtifact|upsertCardPlannedFile|approveCardPlannedFile|upsertCardKnowledgeItem|setCardKnowledgeStatus",
+      "action_type": "updateProject|createWorkflow|createActivity|createCard|updateCard|reorderCard|deleteWorkflow|deleteActivity|deleteCard|linkContextArtifact|createContextArtifact|upsertCardPlannedFile|upsertCardKnowledgeItem",
       "target_ref": {},
       "payload": {}
     }
@@ -271,17 +272,71 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
 |--------|-------------|
 | `createWorkflow` | Create a new workflow in the project |
 | `createActivity` | Create a workflow activity |
-| `createStep` | Create a step within an activity |
-| `createCard` | Create a card in a step or activity |
+| `createCard` | Create a card in an activity |
 | `updateCard` | Update card title, description, status, or priority |
-| `reorderCard` | Move card to new step/position |
+| `reorderCard` | Move card to a new position within its activity |
+| `deleteWorkflow` | Delete a workflow |
+| `deleteActivity` | Delete a workflow activity |
+| `deleteCard` | Delete a card |
 | `linkContextArtifact` | Link a context artifact to a card |
+| `createContextArtifact` | Create project context, optionally linked to a card |
 | `upsertCardPlannedFile` | Create or update a planned file for a card |
-| `approveCardPlannedFile` | Approve or revert a planned file |
 | `upsertCardKnowledgeItem` | Create or update a requirement, fact, assumption, or question |
-| `setCardKnowledgeStatus` | Set status (draft/approved/rejected) on a knowledge item |
 
 Code-generation intents are rejected.
+
+Planned-file approval and knowledge-item status edits use their REST routes; they are not PlanningAction types.
+
+---
+
+## Planning Chat & Finalization
+
+### POST /api/projects/[projectId]/chat
+
+Non-streaming planning chat. Applies generated PlanningAction records directly.
+
+**Request body:**
+```json
+{
+  "message": "Describe the product or requested change",
+  "mode": "scaffold|populate|finalize (optional)",
+  "workflow_id": "uuid (required for targeted populate)",
+  "mock_response": "string (tests only)"
+}
+```
+
+**Response:** `200`
+```json
+{
+  "status": "success",
+  "responseType": "clarification|actions|mixed",
+  "message": "string",
+  "applied": 2,
+  "workflow_ids_created": ["uuid"]
+}
+```
+
+### POST /api/projects/[projectId]/chat/stream
+
+Streaming planning endpoint. Returns Server-Sent Events for scaffold, populate, full planning, and project finalize flows.
+
+Common SSE events include `phase_start`, `action`, `phase_complete`, `error`, and `done`.
+
+### GET /api/projects/[projectId]/cards/[cardId]/finalize
+
+Assembles the card finalization package: card, project docs (`doc|spec|design` artifacts), linked card artifacts, requirements, planned files, and existing `finalized_at`.
+
+### POST /api/projects/[projectId]/cards/[cardId]/finalize
+
+Finalizes a card and streams SSE progress.
+
+Constraints:
+- Project must already have `finalized_at`.
+- Card must have at least one requirement.
+- Card must have at least one planned file or folder.
+- Planning LLM must be enabled to generate the e2e test artifact.
+
+SSE events: `finalize_progress`, `action`, `error`, `done`.
 
 ---
 
@@ -301,7 +356,7 @@ Create artifact. Requires at least one of: `content`, `uri`, `integration_ref`.
 ```json
 {
   "name": "string",
-  "type": "doc|design|code|research|link|image|skill|mcp|cli|api|prompt|spec|runbook",
+  "type": "doc|design|code|research|link|image|skill|mcp|cli|api|prompt|spec|runbook|test",
   "title": "string|null",
   "content": "string|null",
   "uri": "string|null",
@@ -324,6 +379,12 @@ Update artifact. All fields optional.
 ### DELETE /api/projects/[projectId]/artifacts/[artifactId]
 
 Delete artifact. **Response:** `204`
+
+### GET /api/projects/[projectId]/cards/[cardId]/context-artifacts
+
+List context artifacts currently linked to a card. The route verifies the card belongs to the project, then resolves each card-artifact link to the underlying artifact.
+
+**Response:** `200` — Array of ContextArtifact
 
 ---
 
@@ -406,6 +467,39 @@ Delete planned file.
 
 ---
 
+## Card Build Outputs & Push
+
+### GET /api/projects/[projectId]/cards/[cardId]/produced-files
+
+Returns files added or modified by the latest completed build assignment for the card.
+
+**Response:** `200`
+```json
+[
+  { "path": "app/page.tsx", "status": "modified" }
+]
+```
+
+If the card has no completed build assignment, returns `[]`.
+
+### POST /api/projects/[projectId]/cards/[cardId]/push
+
+Pushes the card's completed build feature branch from the local clone to the configured GitHub remote.
+
+Constraints:
+- Project must have a non-placeholder `repo_url`.
+- Card must have a completed build assignment with a feature branch.
+- GitHub credentials must be configured for `pushBranch`.
+
+Common statuses:
+- `200` `{ "success": true, "branch": "feature/..." }`
+- `400` repository not connected
+- `401` GitHub token missing/invalid for push
+- `409` no completed build for the card
+- `502` upstream git push failed
+
+---
+
 ## Project Files (Planned + Repository)
 
 ### GET /api/projects/[projectId]/files
@@ -464,6 +558,37 @@ Use this after merging PRs on GitHub so subsequent builds branch from an up-to-d
 - `400` project missing repo URL / repo not found
 - `401` GitHub authentication/token failure
 - `502` upstream sync error
+
+---
+
+## Memory
+
+### GET /api/projects/[projectId]/memory
+
+Returns memory units stored for the project and the local storage paths used by SQLite and RuVector.
+
+**Response:** `200`
+```json
+{
+  "projectId": "uuid",
+  "count": 1,
+  "units": [
+    {
+      "id": "uuid",
+      "title": "Authentication decisions",
+      "content_type": "text",
+      "status": "active",
+      "updated_at": "2026-06-15T00:00:00.000Z",
+      "content_preview": "Use OAuth...",
+      "link_url": null
+    }
+  ],
+  "storage": {
+    "sqlite": "/home/user/.dossier/dossier.db",
+    "ruvector": "/home/user/.dossier/ruvector/vectors.db"
+  }
+}
+```
 
 ---
 
