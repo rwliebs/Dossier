@@ -218,7 +218,7 @@ Common statuses:
 
 ### GET /api/projects/[projectId]/map
 
-Canonical map snapshot: Workflow → WorkflowActivity → Step → Card tree.
+Canonical map snapshot: Workflow → WorkflowActivity → Card tree. (The `step` table was removed in migration 005.)
 
 **Response:** `200`
 ```json
@@ -230,7 +230,6 @@ Canonical map snapshot: Workflow → WorkflowActivity → Step → Card tree.
       "activities": [
         {
           "id", "workflow_id", "title", "color", "position",
-          "steps": [{ "id", "title", "position", "cards": [...] }],
           "cards": []
         }
       ]
@@ -255,7 +254,7 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
   "actions": [
     {
       "id": "uuid (optional)",
-      "action_type": "createWorkflow|createActivity|createStep|createCard|updateCard|reorderCard|linkContextArtifact|upsertCardPlannedFile|approveCardPlannedFile|upsertCardKnowledgeItem|setCardKnowledgeStatus",
+      "action_type": "updateProject|createWorkflow|createActivity|createCard|updateCard|reorderCard|deleteWorkflow|deleteActivity|deleteCard|linkContextArtifact|createContextArtifact|upsertCardPlannedFile|upsertCardKnowledgeItem",
       "target_ref": {},
       "payload": {}
     }
@@ -269,19 +268,21 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
 
 | Action | Description |
 |--------|-------------|
+| `updateProject` | Update project fields (name, description, tech stack, etc.) |
 | `createWorkflow` | Create a new workflow in the project |
 | `createActivity` | Create a workflow activity |
-| `createStep` | Create a step within an activity |
-| `createCard` | Create a card in a step or activity |
+| `createCard` | Create a card in an activity |
 | `updateCard` | Update card title, description, status, or priority |
-| `reorderCard` | Move card to new step/position |
+| `reorderCard` | Move card to a new position within/between activities |
+| `deleteWorkflow` | Delete a workflow |
+| `deleteActivity` | Delete a workflow activity |
+| `deleteCard` | Delete a card |
 | `linkContextArtifact` | Link a context artifact to a card |
+| `createContextArtifact` | Create a context artifact (e.g. finalize docs, e2e tests) |
 | `upsertCardPlannedFile` | Create or update a planned file for a card |
-| `approveCardPlannedFile` | Approve or revert a planned file |
 | `upsertCardKnowledgeItem` | Create or update a requirement, fact, assumption, or question |
-| `setCardKnowledgeStatus` | Set status (draft/approved/rejected) on a knowledge item |
 
-Code-generation intents are rejected.
+Code-generation intents are rejected. Planned-file approval is not a planning action — it is done via `PATCH /api/projects/[projectId]/cards/[cardId]/planned-files/[fileId]`.
 
 ---
 
@@ -301,7 +302,7 @@ Create artifact. Requires at least one of: `content`, `uri`, `integration_ref`.
 ```json
 {
   "name": "string",
-  "type": "doc|design|code|research|link|image|skill|mcp|cli|api|prompt|spec|runbook",
+  "type": "doc|design|code|research|link|image|skill|mcp|cli|api|prompt|spec|runbook|test|scaffold",
   "title": "string|null",
   "content": "string|null",
   "uri": "string|null",

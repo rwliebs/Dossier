@@ -1,6 +1,6 @@
 ---
 document_id: doc.map
-last_verified: 2026-02-18
+last_verified: 2026-06-16
 tokens_estimate: 550
 tags:
   - map
@@ -8,7 +8,7 @@ tags:
   - story-map
 anchors:
   - id: contract
-    summary: "Map = Project + Workflow→Activity→Step→Card tree; PlanningState in memory"
+    summary: "Map = Project + Workflow→Activity→Card tree; PlanningState in memory"
   - id: build
     summary: "fetchMapSnapshot → PlanningState; buildMapTree → nested API response"
   - id: queries
@@ -22,8 +22,8 @@ ttl_expires_on: null
 ## Contract
 
 ### Invariants
-- INVARIANT: Map structure: Project → Workflow[] → WorkflowActivity[] → Step[] → Card[]
-- INVARIANT: Cards belong to activity; optionally to step (step_id)
+- INVARIANT: Map structure: Project → Workflow[] → WorkflowActivity[] → Card[] (the `step` table was removed in migration 005)
+- INVARIANT: Cards belong to an activity (`workflow_activity_id`)
 - INVARIANT: PlanningState uses Map<string, Entity> for O(1) lookup during validation
 
 ### Boundaries
@@ -36,7 +36,7 @@ ttl_expires_on: null
 
 ### Data Shape
 - **PlanningState**: In-memory; used by validate-action, apply-action, chat
-- **Map API response**: Nested tree for UI; `workflows[].activities[].steps[].cards` + activity-level cards
+- **Map API response**: Nested tree for UI; `workflows[].activities[].cards`
 
 ### Build Flow
 ```
@@ -53,14 +53,13 @@ GET /api/projects/[id]/map
 | `lib/db/map-snapshot.ts` | fetchMapSnapshot, buildMapTree |
 | `lib/schemas/planning-state.ts` | PlanningState interface, createEmptyPlanningState |
 | `lib/db/queries.ts` | getProject, getWorkflowsByProject, getActivitiesByProject, getCardsByProject |
-| `lib/db/queries/workflows.ts` | Workflow + activity + step tree queries |
+| `lib/db/queries/workflows.ts` | Workflow + activity + card tree queries |
 | `app/api/projects/[id]/map/route.ts` | Map endpoint |
 
 ### Tree Structure
 - Workflows ordered by position
 - Activities ordered by position within workflow
-- Steps ordered by position within activity
-- Cards: step-scoped (step_id) or activity-level (step_id null)
+- Cards ordered by position within activity
 
 ---
 
