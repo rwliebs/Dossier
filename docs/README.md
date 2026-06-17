@@ -32,6 +32,7 @@ docs/
 │   ├── api-endpoints.md
 │   ├── configuration-reference.md
 │   ├── database-schema.md
+│   ├── desktop-build-and-distribution.md
 │   ├── memory-coordination-prompt.md
 │   └── skillsmith.md
 │
@@ -65,3 +66,4 @@ docs/
 - [Testing](testing-reference.md)
 - [Data Contracts](domains/data-contracts-reference.md)
 - [User Workflows](product/user-workflows-reference.md)
+- [Desktop Build & Distribution](reference/desktop-build-and-distribution.md)

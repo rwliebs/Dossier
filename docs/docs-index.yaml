@@ -186,6 +186,6 @@ docs_index:
       tags: [releases, desktop, electron, windows, linux, macos, installers]
       anchors:
         - id: ci
-          summary: "Desktop installers workflow: manual or on v* tag; download .exe, .deb, .dmg"
+          summary: "Desktop installers workflow: manual or on v* tag; artifacts + release flow; unsigned-by-default signing status and troubleshooting"
       depends_on: [doc.releases-distribution]
-      last_verified: "2026-03-06"
+      last_verified: "2026-03-09"
