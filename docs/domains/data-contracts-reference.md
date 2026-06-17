@@ -1,6 +1,6 @@
 ---
 document_id: doc.data-contracts
-last_verified: 2026-02-18
+last_verified: 2026-06-16
 tokens_estimate: 1800
 tags:
   - schemas
@@ -11,7 +11,7 @@ anchors:
   - id: contract
     summary: "Zod schemas in lib/schemas/; slice-a/b/c + action-payloads"
   - id: core-entities
-    summary: "Project, Workflow, WorkflowActivity, Step, Card hierarchy"
+    summary: "Project, Workflow, WorkflowActivity, Card hierarchy"
   - id: card-context
     summary: "ContextArtifact, CardPlannedFile, knowledge items"
   - id: actions
@@ -53,10 +53,9 @@ ttl_expires_on: null
 Project
   └── Workflow[] (position-ordered)
         └── WorkflowActivity[] (position-ordered)
-              ├── Step[] (position-ordered)
-              │     └── Card[] (step_id or activity-level)
-              └── Card[] (activity-level, no step)
+              └── Card[] (position-ordered)
 ```
+(The `step` table was removed in migration 005; cards attach directly to an activity.)
 
 ### Project
 | Field | Type | Notes |
@@ -90,14 +89,14 @@ Project
 | Field | Type | Notes |
 |-------|------|-------|
 | id | uuid | |
-| workflow_activity_id | uuid | |
-| step_id | uuid \| null | optional, for step-scoped cards |
+| workflow_activity_id | uuid | cards attach to an activity (the `step` table was removed in migration 005) |
 | title | string (min 1) | |
 | description | string \| null | optional |
 | status | enum | todo\|active\|questions\|review\|production |
 | priority | int | |
 | position | int | |
 | quick_answer | string \| null | optional |
+| finalized_at | string (datetime) \| null | set at per-card finalize; required before build |
 
 ---
 
@@ -109,7 +108,7 @@ Project
 | id | uuid | |
 | project_id | uuid | |
 | name | string (min 1) | |
-| type | enum | doc\|design\|code\|research\|link\|image\|skill\|mcp\|cli\|api\|prompt\|spec\|runbook\|test |
+| type | enum | doc\|design\|code\|research\|link\|image\|skill\|mcp\|cli\|api\|prompt\|spec\|runbook\|test\|scaffold |
 | content | string \| null | at least one of content, uri, integration_ref |
 | uri | string \| null | |
 | integration_ref | object \| null | |
@@ -153,12 +152,15 @@ All actions: `{ id, project_id, action_type, target_ref, payload }`
 | createCard | `{ workflow_activity_id }` | `{ title, description?, status, priority, position }` |
 | updateCard | `{ card_id }` | `{ title?, description?, status?, priority?, quick_answer? }` |
 | reorderCard | `{ card_id }` | `{ new_position }` |
+| deleteWorkflow | `{ workflow_id }` | `{}` |
+| deleteActivity | `{ workflow_activity_id }` | `{}` |
+| deleteCard | `{ card_id }` | `{}` |
 | linkContextArtifact | `{ card_id }` | `{ context_artifact_id, linked_by?, usage_hint? }` |
 | createContextArtifact | `{ project_id }` | `{ name, type, title?, content, card_id? }` |
 | upsertCardPlannedFile | `{ card_id }` | `{ logical_file_name, artifact_kind, action, intent_summary, contract_notes?, position, planned_file_id? }` |
-| approveCardPlannedFile | `{ card_id }` | `{ planned_file_id, status: "approved"\|"proposed" }` |
 | upsertCardKnowledgeItem | `{ card_id }` | `{ item_type, text, evidence_source?, confidence?, position, knowledge_item_id? }` |
-| setCardKnowledgeStatus | `{ card_id }` | `{ knowledge_item_id, status }` |
+
+Note: planned-file approval and knowledge-item status changes are not planning actions. Approve a planned file via `PATCH /cards/[cardId]/planned-files/[fileId]`; set knowledge status via `upsertCardKnowledgeItem`.
 
 ---
 

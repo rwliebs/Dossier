@@ -77,41 +77,43 @@ Dossier separates three distinct layers of state:
 
 | Layer | What it contains | Storage |
 |-------|------------------|---------|
-| **Product structure** | Product → Workflow → Feature card hierarchy, rich context cards | Database |
-| **Workflow state** | Attempt status, agent logs, execution history | Database |
-| **Code state** | Branches, commits, file changes | Git (feature branches per attempt) |
+| **Product structure** | Project → Workflow → Activity → Card hierarchy, rich context cards | SQLite (`dossier.db`) + RuVector (`ruvector/vectors.db`) for embeddings |
+| **Run state** | Orchestration runs, card assignments, agent executions, checks | SQLite (`dossier.db`) |
+| **Code state** | Branches, commits, file changes | Git (one feature branch per card per run) |
 
 The product structure layer is Dossier's differentiator. This is where your vision lives, where context accumulates, and where you shape what gets built.
 
 ### Data model
 
 ```
-Product
-└── Workflow (many)           — user's perspective (journey, actions)
-    └── Feature card (many)   — how the software will work
-        ├── Card (1:1)
-        │   ├── Facts           — known truths about this feature
-        │   ├── Assumptions     — working beliefs to validate
-        │   ├── Questions       — unresolved decisions
-        │   ├── Context docs    — linked files and documents
-        │   └── GeneratedPrompt — ready for agent dispatch
-        └── Attempt (many)
-            ├── Agent used
-            ├── Prompt sent
-            ├── Status          — pending | running | success | failed
-            ├── Output / Diff
-            └── Feedback
+Project
+└── Workflow (many)               — user's perspective (journey, actions)
+    └── WorkflowActivity (many)   — grouping within a workflow
+        └── Card (many)           — a unit of functionality to build
+            ├── Requirements        — what must be true
+            ├── Facts               — known truths about this feature
+            ├── Assumptions         — working beliefs to validate
+            ├── Questions           — unresolved decisions
+            ├── Planned files       — files/folders the build may touch
+            └── Context artifacts   — linked docs, designs, e2e tests (many-to-many)
+
+Build (tracked separately, keyed to cards):
+OrchestrationRun (many)
+└── CardAssignment (per card)
+    ├── AgentExecution            — agent run; status pending | running | success | failed
+    └── AgentCommit               — commits on the card's feature branch
+OrchestrationRun also has → RunCheck, ApprovalRequest, PullRequestCandidate
 ```
 
 ### Tech stack
 
 | Layer | Technology |
 |-------|------------|
-| **Frontend** | React + TypeScript + Tailwind CSS (Next.js) |
-| **Backend** | Node.js / TypeScript |
-| **Database** | SQLite (local-first, `~/.dossier/dossier.db`) |
-| **Agent support** | Cursor, Claude Code — agent-agnostic by design (agentic-flow) |
-| **Isolation** | Feature branches per attempt |
+| **Frontend** | React 19 + TypeScript + Tailwind CSS (Next.js App Router) |
+| **API** | Next.js App Router route handlers (in-process; no separate backend service) |
+| **Database** | SQLite (local-first, `~/.dossier/dossier.db`); RuVector for embeddings (`~/.dossier/ruvector/vectors.db`) |
+| **Build agents** | `@anthropic-ai/claude-agent-sdk` `query()` (in-process); agent definitions from agentic-flow |
+| **Isolation** | One feature branch per card per run (`feat/run-<run8>-<card8>`) |
 
 ---
 
@@ -174,10 +176,10 @@ NEW: Use your Claude MAX account directly, no extra setup required (if you've go
 - **Product map:** Create and edit projects; add workflows and feature cards; manage cards with requirements, facts, assumptions, questions, and linked context.
 - **Planning agent:** Chat to infer workflows from a connected repo and README; populate the map with activities and cards.
 - **Approval:** Per-card approve with generated context packages and E2E test specs; planned files and context documents attached to cards.
-- **Build orchestration:** Trigger builds per card or workflow; feature branches per attempt; agentic-flow execution; run status, checks, and PR lifecycle (GitHub optional for local file writes).
+- **Build orchestration:** Trigger builds per card or workflow; one feature branch per card per run; in-process Claude Agent SDK execution; auto-commit, run status, and checks. Pushing a branch is one click ("Merge feature"); the pull request is created and merged manually on GitHub (Dossier records a PR candidate but does not call the GitHub PR API).
 - **Repository integration:** Connect a GitHub repo (optional); select files for context; file tree and diff status in the UI.
 - **Context documents:** Add and edit FILES and DOCS via the agent in chat; surface to agents at build time. Direct editing in the UI is coming later.
-- **Local-first:** All product and run state in SQLite under `~/.dossier/`; no data leaves your machine except via your Anthropic and (if used) GitHub connection.
+- **Local-first:** Relational product and run state in SQLite (`~/.dossier/dossier.db`); vector embeddings in a local RuVector store (`~/.dossier/ruvector/vectors.db`); build clones under `~/.dossier/repos/`. No data leaves your machine except via your Anthropic and (if used) GitHub connection.
 
 ---
 

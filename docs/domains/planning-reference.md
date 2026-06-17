@@ -1,6 +1,6 @@
 ---
 document_id: doc.planning
-last_verified: 2026-04-13
+last_verified: 2026-06-16
 tokens_estimate: 750
 tags:
   - planning
@@ -28,7 +28,7 @@ ttl_expires_on: null
 
 ### Boundaries
 - ALLOWED: createWorkflow, createActivity, createCard, updateCard, linkContextArtifact, upsertCardPlannedFile, createContextArtifact, etc.
-- ALLOWED (finalize mode only): createContextArtifact with type 'test' containing e2e test code
+- ALLOWED (per-card finalize only): createContextArtifact with type 'test' containing e2e test code
 - FORBIDDEN: Generating implementation/production code; triggering builds; writing to GitHub; creating real files
 
 ---
@@ -39,21 +39,34 @@ ttl_expires_on: null
 | Mode | When | Output |
 |------|------|--------|
 | scaffold | Map empty or no workflows | updateProject + createWorkflow only |
-| populate | Workflows exist, activities/cards sparse | createActivity, createStep, createCard |
+| populate | Workflows exist, activities/cards sparse | createActivity, createCard |
 | full | Map has structure | All action types; refinements, links, planned files |
-| finalize | Map fully planned; user triggers | createContextArtifact (project docs + card e2e tests) |
+| finalize | Map fully planned; user triggers | createContextArtifact (six project-wide docs; see Project Finalize Flow) |
 
 Mode selected by `lib/llm/planning-prompt.ts` based on map state.
 
 ### Flow
 ```
 User message → POST /chat/stream
-  → buildPlanningSystemPrompt() | buildScaffoldSystemPrompt() | buildPopulateSystemPrompt() | buildFinalizeSystemPrompt()
-  → Claude API (streaming)
+  → buildPlanningSystemPrompt() | buildScaffoldSystemPrompt() | buildPopulateSystemPrompt()
+  → Agent SDK query() (credentialed) or `claude` CLI subprocess (fallback)
   → stream-action-parser (parse JSON blocks)
   → PlanningAction[] emitted
-  → POST /actions (validate + apply)
+  → applied in-process via pipelineApply() (validate + apply); no HTTP round-trip to /actions
 ```
+
+### Project Finalize Flow
+```
+User clicks "Finalize Project" → POST /chat (or /chat/stream) with mode: "finalize"
+  → runFinalizeMultiStep()
+  → Promise.all over FINALIZE_DOC_SPECS (six docs, generated in parallel):
+      architectural-summary, data-contracts, domain-summaries,
+      user-workflow-summaries, design-system, project-scaffold
+  → each via buildFinalizeDocSystemPrompt(spec) → createContextArtifact
+  → parse arch summary for root folders; write scaffold files to clone (if repo connected)
+  → set project.finalized_at
+```
+Note: the project finalize step does NOT generate per-card e2e tests; those are generated at per-card finalize (below).
 
 ### Per-Card Finalize Flow
 ```
@@ -61,7 +74,7 @@ User opens finalize panel → GET /cards/[cardId]/finalize
   → Return package: card + project_docs + card_artifacts + requirements + planned_files
 User confirms finalize → POST /cards/[cardId]/finalize (SSE)
   → link_docs step: link project doc/spec/design artifacts to card
-  → test_gen step: generate e2e test/context artifact actions via LLM
+  → test_gen step: generate one e2e test/context artifact via LLM (best-effort)
   → confirm step: set card.finalized_at, optionally ingest memory context
   → Emit done
 ```
@@ -79,8 +92,10 @@ Per-card finalize preconditions (enforced by route):
 | `lib/llm/planning-prompt.ts` | System prompts; mode selection |
 | `lib/llm/stream-action-parser.ts` | Parse streaming JSON → actions |
 | `lib/llm/build-preview-response.ts` | Preview response before apply |
-| `lib/llm/claude-client.ts` | Planning LLM client (Messages API) |
-| `lib/llm/planning-credential.ts` | Resolves ANTHROPIC_API_KEY from env or ~/.dossier/config |
+| `lib/llm/claude-client.ts` | Planning LLM client; routes credentialed users to Agent SDK, others to `claude` CLI |
+| `lib/llm/planning-sdk-runner.ts` | Agent SDK `query()` runner (`runPlanningQuery`, `streamPlanningQuery`); default model `claude-haiku-4-5-20251001` |
+| `lib/llm/run-finalize-multistep.ts` | Parallel project finalize (one LLM call per `FINALIZE_DOC_SPECS` entry) |
+| `lib/llm/planning-credential.ts` | Resolves ANTHROPIC_API_KEY / OAuth token from env or ~/.dossier/config |
 | `app/api/projects/[id]/chat/route.ts` | Non-streaming chat |
 | `app/api/projects/[id]/chat/stream/route.ts` | Streaming chat (scaffold, populate, finalize) |
 | `app/api/projects/[id]/cards/[cardId]/finalize/route.ts` | Per-card finalize endpoint |

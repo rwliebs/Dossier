@@ -1,6 +1,6 @@
 ---
 document_id: doc.system-architecture
-last_verified: 2026-03-06
+last_verified: 2026-06-16
 tokens_estimate: 950
 tags:
   - architecture
@@ -52,7 +52,7 @@ Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stor
 │  │                     │                   │             │   │
 │  │  ┌──────────────────┴───────┐   ┌──────┴──────┐      │   │
 │  │  │ SQLite (better-sqlite3)  │   │ RuVector    │      │   │
-│  │  │ ~/.dossier/dossier.db    │   │ (WASM,      │      │   │
+│  │  │ ~/.dossier/dossier.db    │   │ (native,    │      │   │
 │  │  │                          │   │  384-dim)   │      │   │
 │  │  └──────────────────────────┘   └─────────────┘      │   │
 │  └──────────────────────────────────────────────────────┘   │
@@ -121,7 +121,7 @@ Detail: [map-reference.md](domains/map-reference.md)
 Detail: [mutation-reference.md](domains/mutation-reference.md)
 
 ### Build
-`User trigger → git clone → createRun → per card: feature branch → dispatch → Claude Agent SDK query() (streaming) → agent writes + commits → auto-commit → checks → approval → PR`
+`User trigger → git clone → createRun → per card: feature branch (`feat/run-<run8>-<card8>`) → dispatch → Claude Agent SDK query() (streaming) → agent writes + commits → auto-commit → checks → user pushes branch → PR created/merged manually on GitHub`
 
 Detail: [orchestration-reference.md](domains/orchestration-reference.md)
 
@@ -138,12 +138,12 @@ Two distinct connection patterns exist.
 
 | Concern | Planning LLM | Build Agent |
 |---------|-------------|-------------|
-| Auth | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
-| SDK | `@anthropic-ai/sdk` (Messages API) | `@anthropic-ai/claude-agent-sdk` |
-| Call style | `messages.create` / `messages.stream` | `query()` — async iterator |
-| Streaming | Optional (non-streaming for simple calls, streaming for chat) | Always streaming (`for await` over messages) |
-| Tools | None (text output only) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
-| CWD | N/A | `worktree_path` (repo clone) |
+| Auth | `ANTHROPIC_API_KEY` or OAuth token (credentialed); `claude` CLI session (fallback) | `ANTHROPIC_API_KEY` |
+| SDK | `@anthropic-ai/claude-agent-sdk` `query()` (credentialed) or `claude` CLI subprocess (fallback) | `@anthropic-ai/claude-agent-sdk` |
+| Call style | `query()` — async iterator (or `claude -p` subprocess) | `query()` — async iterator |
+| Streaming | Both: `streamPlanningQuery` for chat, `runPlanningQuery` (awaits final result) for one-shot calls | Always streaming (`for await` over messages) |
+| Tools | Read-only: WebSearch always; Read/Glob/Grep when a repo is connected (no Write/Edit/Bash) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
+| CWD | Repo clone when connected (read-only inspection) | `worktree_path` (repo clone) |
 | Lifecycle | Request-response per chat turn | Fire-and-forget; result via in-process webhook callback |
 | Model | `claude-haiku-4-5-20251001` (configurable) | `claude-sonnet-4-5-20250929` (configurable) |
 

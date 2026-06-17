@@ -1,6 +1,6 @@
 ---
 document_id: doc.orchestration
-last_verified: 2026-06-08
+last_verified: 2026-06-16
 tokens_estimate: 1300
 tags:
   - orchestration
@@ -10,7 +10,7 @@ anchors:
   - id: contract
     summary: "OrchestrationRun → CardAssignment; checks before approval; PR user-gated"
   - id: flow
-    summary: "triggerBuild gates → clone → run → assignments → SDK dispatch → checks → approval → PR"
+    summary: "triggerBuild gates → clone → run → assignments → SDK dispatch → auto-commit → checks; PR candidate is a DB record, PR opened/merged manually on GitHub"
   - id: policy
     summary: "SystemPolicyProfile: required_checks, protected_paths, forbidden_paths"
 ttl_expires_on: null
@@ -24,7 +24,7 @@ ttl_expires_on: null
 ### Invariants
 - INVARIANT: OrchestrationRun has immutable system_policy_snapshot and run_input_snapshot
 - INVARIANT: Approval requested only after required checks pass
-- INVARIANT: PR creation and merge remain user-gated; no auto-merge to main
+- INVARIANT: Build agents push feature branches only; PR creation and merge happen manually on GitHub — Dossier does not call the GitHub PR API and never auto-merges to main
 
 ### Boundaries
 - ALLOWED: createRun, createAssignment, execute checks, create approval request, create PR candidate
@@ -39,19 +39,22 @@ ttl_expires_on: null
 User trigger (card | workflow)
   → recover stale runs when DOSSIER_STALE_RUN_MINUTES > 0
   → enforce single-build lock (no existing running run for project)
-  → validate project, repo URL, cards in scope, and card finalization
-  → ensureClone (repo to ~/.dossier/repos/<projectId>/)
+  → validate project, repo URL, cards in scope, and card finalization (reject any card without finalized_at → decision_required)
+  → ensureClone (repo to ~/.dossier/repos/<projectId>/) — one clone per run
   → createRun (validate policy, capture snapshots; worktree_root = clone path)
-  → createFeatureBranch per card from baseBranch
+  → per card: createFeatureBranch `feat/run-<run8>-<card8>` from baseBranch (new branch each rebuild)
   → createAssignment per card (feature_branch, worktree_path, allowed_paths, forbidden_paths)
   → dispatch to agentic-flow (cwd = worktree_path)
   → agents write files, commit to feature branch
+  → on completion: processWebhook() auto-commits agent output, runs checks, harvests memory
   → GET /api/projects/[id]/files?source=repo surfaces produced files with diff status
-  → execute checks (dependency, security, policy, lint, unit, integration, e2e)
-  → approval gates: request approval only if checks pass
-  → createPullRequestCandidate (draft)
-  → user reviews, approves merge
 ```
+Both `scope=card` and `scope=workflow` are supported (a workflow build clones once and creates one branch per card).
+
+Approval requests, the PR candidate record, and push/merge are NOT part of the automatic post-run chain. They are reached on demand:
+- **Approval** (`POST /orchestration/approvals`) — guarded so it only succeeds after required checks pass.
+- **PR candidate** (`POST /orchestration/pull-requests`) — inserts a `PullRequestCandidate` DB row with status `not_created`. It is NOT a GitHub PR and does not call the GitHub API.
+- **Push** (`POST /cards/[cardId]/push`, surfaced as the card "Merge feature" control) — pushes the card's feature branch to `origin` and opens the repo URL in the browser. The user creates and merges the PR on GitHub.
 
 ### Scope Rules
 - `scope=workflow` → workflow_id required, card_id null
@@ -110,7 +113,7 @@ dispatch.ts → createAgenticFlowClient() → SDK query()
 ### Key Files
 | File | Purpose |
 |------|---------|
-| `lib/orchestration/repo-manager.ts` | ensureClone, createFeatureBranch; clone to ~/.dossier/repos/ |
+| `lib/orchestration/repo-manager.ts` | ensureClone, createFeatureBranch, pushBranch, syncMainBranch; clone to ~/.dossier/repos/ |
 | `lib/orchestration/repo-reader.ts` | getRepoFileTree, getChangedFiles, getFileContent, getFileDiff |
 | `lib/orchestration/create-run.ts` | createRun; policy validation; snapshot capture |
 | `lib/orchestration/create-assignment.ts` | CardAssignment per card |
@@ -121,7 +124,7 @@ dispatch.ts → createAgenticFlowClient() → SDK query()
 | `lib/orchestration/execute-checks.ts` | Run required checks |
 | `lib/orchestration/approval-gates.ts` | Check pass before approval request |
 | `lib/orchestration/create-approval-request.ts` | ApprovalRequest creation |
-| `lib/orchestration/create-pull-request-candidate.ts` | Draft PR creation |
+| `lib/orchestration/create-pull-request-candidate.ts` | Inserts a `PullRequestCandidate` DB row (status `not_created`); no GitHub API call |
 | `lib/orchestration/run-validation.ts` | validateRunInputAgainstPolicy |
 
 ### Policy Profile

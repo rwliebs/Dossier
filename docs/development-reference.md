@@ -1,6 +1,6 @@
 ---
 document_id: doc.development
-last_verified: 2026-04-13
+last_verified: 2026-06-16
 tokens_estimate: 700
 tags:
   - development
@@ -25,8 +25,8 @@ ttl_expires_on: null
 
 ## Contract
 
-- INVARIANT: Frontend port 3000; backend 8000 when applicable
-- INVARIANT: Kill and restart servers rather than using higher ports
+- INVARIANT: Dossier is a single Next.js app (UI + API route handlers) served on port 3000; there is no separate backend service/port
+- INVARIANT: Kill and restart the dev server rather than moving to higher ports (the built-app "View on server" preview uses 3001+ for project clones)
 - INVARIANT: Run tests before commit; type-check before push
 
 ---
@@ -114,9 +114,11 @@ Default: `~/.dossier/`
 
 ```
 ~/.dossier/
-  config       # API keys, settings (KEY=VALUE)
-  dossier.db   # SQLite database
-  ruvector/    # Vector index storage used by memory plane
+  config              # API keys, settings (KEY=VALUE)
+  dossier.db          # SQLite database (relational state)
+  ruvector/vectors.db # RuVector vector store (native ruvector-core; 384-dim embeddings)
+  repos/<projectId>/  # Git clones used for builds
+  logs/               # Electron main process logs
 ```
 
 Override: `DOSSIER_DATA_DIR` or `SQLITE_PATH`

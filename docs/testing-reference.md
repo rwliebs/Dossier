@@ -1,6 +1,6 @@
 ---
 document_id: doc.testing
-last_verified: 2026-02-19
+last_verified: 2026-06-16
 tokens_estimate: 900
 tags:
   - testing
@@ -101,12 +101,11 @@ Tests assert the following product invariants (from user-workflows-reference.md)
 
 | Outcome | Test Location |
 |--------|---------------|
-| Build requires finalized_at + approved planned files | `trigger-build.test.ts` |
-| Build rejects when card(s) lack finalized_at | `trigger-build.test.ts` |
-| Build rejects when no cards have approved planned files | `trigger-build.test.ts` |
+| Build requires finalized_at on every targeted card (planned files are optional at build time) | `trigger-build.test.ts` |
+| Build rejects when card(s) lack finalized_at (decision_required) | `trigger-build.test.ts` |
 | artifact_kind excludes test (tests live as ContextArtifact type:test) | `slice-b.test.ts` |
-| Per-card finalize validates requirements + planned files; sets finalized_at | `finalize.test.ts` |
-| E2E: build-ready = approved planned files + finalized | `project-to-cards-flow.test.ts` |
+| Per-card finalize requires project finalized + ≥1 requirement + ≥1 planned file/folder; sets finalized_at (planned-file status not checked) | `finalize.test.ts` |
+| E2E: build-ready = card finalized (finalized_at set) | `project-to-cards-flow.test.ts` |
 
 ## Verification
 - [ ] All tests pass before commit

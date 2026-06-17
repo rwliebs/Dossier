@@ -51,12 +51,13 @@ Anthropic credential (API key or Claude CLI config) and GitHub token:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| DB_DRIVER | sqlite | `sqlite` (implemented) or `postgres` (currently not implemented) |
-| DATABASE_URL | — | Required only if testing future Postgres adapter paths |
+| DB_DRIVER | sqlite | `sqlite` is the only working driver. `postgres` is reserved for a future hosted mode and currently throws "Postgres adapter not yet implemented". |
+| DATABASE_URL | — | Reserved for the future Postgres adapter (not yet implemented). |
 | DOSSIER_DATA_DIR | ~/.dossier | Data directory |
 | SQLITE_PATH | ~/.dossier/dossier.db | Override SQLite path |
-| EMBEDDING_MODEL | all-MiniLM-L6-v2 | RuVector embedding model |
-| PLANNING_LLM_MODEL | claude-haiku-4-5-20251001 | Planning LLM model |
+| EMBEDDING_MODEL | all-MiniLM-L6-v2 | Embedding model (ONNX-in-WASM, 384-dim) used for RuVector vectors |
+| PLANNING_LLM_MODEL | claude-haiku-4-5-20251001 | Planning LLM model (Agent SDK path; CLI fallback defaults to `claude-sonnet-4-6`) |
+| COMPLETION_MODEL | claude-sonnet-4-5-20250929 | Build agent model (Claude Agent SDK `query()`) |
 | DOSSIER_STALE_RUN_MINUTES | 0 | Minutes before marking stuck runs as failed. 0 = disabled (no timeout). |
 
 Current implementation note:
