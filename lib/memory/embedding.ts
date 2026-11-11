@@ -80,7 +80,7 @@ async function loadWasmModule(): Promise<Record<string, unknown> | null> {
     const mod = (await import(
       /* webpackIgnore: true */
       "ruvector-onnx-embeddings-wasm"
-    )) as Record<string, unknown> & { default?: Record<string, unknown> };
+    )) as unknown as Record<string, unknown> & { default?: Record<string, unknown> };
     return (mod.default ?? mod) as Record<string, unknown>;
   } catch {
     return null;
