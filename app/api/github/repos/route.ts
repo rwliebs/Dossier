@@ -43,6 +43,7 @@ export async function GET(_request: NextRequest) {
       html_url: string;
       clone_url: string;
       private: boolean;
+      default_branch: string;
     }>;
 
     const repos = data.map((r) => ({
@@ -50,6 +51,7 @@ export async function GET(_request: NextRequest) {
       html_url: r.html_url,
       clone_url: r.clone_url,
       private: r.private,
+      default_branch: r.default_branch,
     }));
 
     return json({ repos });
@@ -125,6 +127,7 @@ export async function POST(request: NextRequest) {
       html_url: string;
       clone_url: string;
       private: boolean;
+      default_branch: string;
     };
 
     return json({
@@ -132,6 +135,7 @@ export async function POST(request: NextRequest) {
       html_url: repo.html_url,
       clone_url: repo.clone_url,
       private: repo.private,
+      default_branch: repo.default_branch,
     });
   } catch (err) {
     console.error("POST /api/github/repos error:", err);

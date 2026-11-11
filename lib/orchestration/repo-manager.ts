@@ -260,10 +260,36 @@ export function createFeatureBranch(
   }
 }
 
+/** True when refs/remotes/origin/<branch> exists in the local clone (after fetch). */
+function remoteBranchExists(clonePath: string, branch: string): boolean {
+  try {
+    runGitSync(clonePath, `rev-parse --verify --quiet origin/${branch}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Asks origin which branch its HEAD points to (the remote's default branch).
+ * Uses ls-remote instead of refs/remotes/origin/HEAD: that ref is only set at
+ * clone time and can be missing or point at a stale branch.
+ */
+export function getRemoteDefaultBranch(clonePath: string): string | null {
+  try {
+    const out = runGitSync(clonePath, "ls-remote --symref origin HEAD");
+    const match = out.match(/^ref: refs\/heads\/(\S+)\s+HEAD$/m);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Syncs the local base branch (e.g. main) with origin.
  * Fetches from origin, then checks out the base branch and resets it to origin/<baseBranch>.
- * If origin/<baseBranch> is missing, falls back to origin/HEAD (the remote's default branch).
+ * If origin/<baseBranch> is missing, uses the remote's default branch (from ls-remote HEAD)
+ * and returns its name in `branch`, so the caller can correct the project's default_branch.
  * Use after merging PRs on GitHub so the Dossier clone's local main is up to date.
  * If the clone does not exist, runs ensureClone first (fetch + optional clone).
  */
@@ -287,39 +313,32 @@ export function syncMainBranch(
   const clonePath = cloneResult.clonePath;
 
   try {
-    let targetRef = `origin/${baseBranch}`;
-    let resolved = false;
+    // Prefer the saved branch. If it is missing on origin, use the remote's
+    // actual default branch and return its name so the caller can correct the project record.
+    let resolvedBranch: string | null = null;
 
-    try {
-      runGitSync(clonePath, `rev-parse --verify ${targetRef}`);
-      resolved = true;
-    } catch {
-      // origin/<baseBranch> not found — try origin/HEAD to detect remote default
-    }
-
-    if (!resolved) {
-      try {
-        const symref = runGitSync(clonePath, "symbolic-ref refs/remotes/origin/HEAD");
-        targetRef = symref.replace("refs/remotes/", "");
-        resolved = true;
-      } catch {
-        // origin/HEAD not set either
+    if (remoteBranchExists(clonePath, baseBranch)) {
+      resolvedBranch = baseBranch;
+    } else {
+      const remoteDefault = getRemoteDefaultBranch(clonePath);
+      if (remoteDefault && remoteBranchExists(clonePath, remoteDefault)) {
+        resolvedBranch = remoteDefault;
       }
     }
 
-    if (!resolved) {
+    if (!resolvedBranch) {
       return {
         success: false,
         error: `Remote branch "${baseBranch}" not found after fetch. Check that the default branch name in project settings matches your GitHub repository.`,
       };
     }
 
-    execSync(`git checkout -B "${baseBranch}" "${targetRef}"`, {
+    execSync(`git checkout -B "${resolvedBranch}" "origin/${resolvedBranch}"`, {
       cwd: clonePath,
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    return { success: true, branch: baseBranch };
+    return { success: true, branch: resolvedBranch };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {

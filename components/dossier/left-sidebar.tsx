@@ -265,7 +265,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   // GitHub connect dialog state
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [connectMode, setConnectMode] = useState<'link' | 'create'>('link');
-  const [repos, setRepos] = useState<Array<{ full_name: string; html_url: string; private: boolean }>>([]);
+  const [repos, setRepos] = useState<Array<{ full_name: string; html_url: string; private: boolean; default_branch?: string }>>([]);
   const [reposLoading, setReposLoading] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createPrivate, setCreatePrivate] = useState(false);
@@ -352,11 +352,11 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   }, [project.repo_url, openConnectDialog]);
 
   const linkRepo = useCallback(
-    async (htmlUrl: string) => {
+    async (htmlUrl: string, defaultBranch?: string) => {
       setConnectSubmitting(true);
       setConnectError(null);
       try {
-        const result = await onProjectUpdate?.({ repo_url: htmlUrl, default_branch: 'main' });
+        const result = await onProjectUpdate?.({ repo_url: htmlUrl, default_branch: defaultBranch });
         if (result !== false) setConnectDialogOpen(false);
         else setConnectError('Failed to link repository.');
       } catch {
@@ -387,7 +387,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
         setConnectSubmitting(false);
         return;
       }
-      const linked = await onProjectUpdate?.({ repo_url: data.html_url, default_branch: 'main' });
+      const linked = await onProjectUpdate?.({ repo_url: data.html_url, default_branch: data.default_branch });
       if (linked !== false) setConnectDialogOpen(false);
       else setConnectError('Repository created but failed to link to project.');
     } catch {
@@ -931,7 +931,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
                         <button
                           type="button"
                           className="w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] hover:bg-secondary"
-                          onClick={() => linkRepo(r.html_url)}
+                          onClick={() => linkRepo(r.html_url, r.default_branch)}
                           disabled={connectSubmitting}
                         >
                           <Github className="h-3 w-3 shrink-0" />

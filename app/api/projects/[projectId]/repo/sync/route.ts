@@ -36,7 +36,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const result = syncMainBranch(projectId, repoUrl, baseBranch);
 
     if (result.success) {
-      return json({ success: true, branch: result.branch ?? baseBranch });
+      const branch = result.branch ?? baseBranch;
+      // The saved branch was missing on origin, so the remote default was used.
+      // Persist it so later clones, builds, and PRs target the branch that exists.
+      if (branch !== baseBranch) {
+        await db.updateProject(projectId, { default_branch: branch });
+      }
+      return json({ success: true, branch });
     }
 
     const status =
