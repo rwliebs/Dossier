@@ -16,7 +16,10 @@ const LOOPBACK_HOST = "127.0.0.1";
 function canBind(candidate, host) {
   return new Promise((resolve) => {
     const probe = createServer();
-    probe.once("error", () => resolve(false));
+    probe.once("error", (e) => {
+      console.error(`DBG canBind candidate=${candidate} host=${host} code=${e.code} msg=${e.message}`);
+      resolve(false);
+    });
     probe.once("listening", () => probe.close(() => resolve(true)));
     probe.listen(candidate, host);
   });
