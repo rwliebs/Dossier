@@ -44,3 +44,4 @@ jobs:
         # Publishes to 'latest' so `npm i dossier-agentic-product-planner-builder` gets this version.
         # OIDC auth when this workflow is registered as a Trusted Publisher on npm.
         # Do not pass --no-git-checks: that is a pnpm flag; npm 12+ errors on unknown CLI flags.
+        # package-import-method=copy in .npmrc avoids E415 "Hard link is not allowed" when packing bundledDependencies.
