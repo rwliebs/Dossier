@@ -28,7 +28,7 @@ A real Windows user installed the npm package and eventually succeeded — but o
 
 ### 2. .next/standalone ships without compiled binary
 
-Same root cause as #1. `scripts/copy-native-deps.sh` skips `better-sqlite3` because platform-specific binaries can't be cross-bundled. The postinstall handles installing them fresh. If the existing `prebuild-install` mechanism works (and it does for standard Node.js installations with network access), this is not an issue.
+Same root cause as #1. `scripts/postbuild.mjs` skips `better-sqlite3` because platform-specific binaries can't be cross-bundled. The postinstall handles installing them fresh. If the existing `prebuild-install` mechanism works (and it does for standard Node.js installations with network access), this is not an issue.
 
 ### 3. `spawn('start', [url])` breaks on Windows Command Prompt — FIXED
 
