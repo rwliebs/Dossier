@@ -40,10 +40,12 @@ interface RightPanelProps {
   docsList?: ContextArtifact[];
   /** Called when user selects a doc from the list; pass null to clear selection */
   onSelectDoc?: (doc: ContextArtifact | null) => void;
-  /** When set, files tab shows this card's feature branch; null = main */
+  /** When set, files tab shows this card's feature branch; null = the project's base branch */
   filesBranchCardId?: string | null;
-  /** Called when user switches branch context (null = main) */
+  /** Called when user switches branch context (null = the project's base branch) */
   onFilesBranchChange?: (cardId: string | null) => void;
+  /** The project's default branch name (for example `master`), shown as the Files tab base branch */
+  baseBranch?: string;
   /** Card title when filesBranchCardId is set (for display) */
   filesBranchCardTitle?: string;
 }
@@ -137,6 +139,7 @@ export function RightPanel({
   filesBranchCardId = null,
   onFilesBranchChange,
   filesBranchCardTitle,
+  baseBranch,
 }: RightPanelProps) {
   const filesSource: ProjectFilesSource = "repo";
   const [selectedRepoFilePath, setSelectedRepoFilePath] = useState<string | null>(null);
@@ -220,7 +223,7 @@ export function RightPanel({
                     )}
                   </span>
                 ) : (
-                  <span>main</span>
+                  <span>{baseBranch ?? ""}</span>
                 )}
                 {filesLoading && projectId && (
                   <>
@@ -234,9 +237,9 @@ export function RightPanel({
                   type="button"
                   onClick={() => onFilesBranchChange(null)}
                   className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground flex-shrink-0"
-                  aria-label="Switch to main branch"
+                  aria-label={`Switch to ${baseBranch ?? "base"} branch`}
                 >
-                  Show main
+                  Show {baseBranch ?? "base"}
                 </button>
               )}
             </div>

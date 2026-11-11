@@ -58,6 +58,7 @@ describe("RightPanel", () => {
         activeTab="files"
         onTabChange={() => {}}
         projectId="p1"
+        baseBranch="main"
       />
     );
 
@@ -65,5 +66,53 @@ describe("RightPanel", () => {
       expect(fetch).toHaveBeenCalledWith("/api/projects/p1/files?source=repo");
     });
     expect(screen.getByText("main")).toBeInTheDocument();
+  });
+
+  it("labels the files base branch with the project's default branch, not a hardcoded main", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) } as Response);
+
+    render(
+      <RightPanel
+        isOpen
+        onClose={() => {}}
+        activeDoc={null}
+        activeTab="files"
+        onTabChange={() => {}}
+        projectId="p1"
+        baseBranch="master"
+      />
+    );
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith("/api/projects/p1/files?source=repo");
+    });
+    expect(screen.getByText("master")).toBeInTheDocument();
+    expect(screen.queryByText("main")).not.toBeInTheDocument();
+  });
+
+  it("shows the base branch name in the switch-back control when viewing a card branch", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) } as Response);
+
+    render(
+      <RightPanel
+        isOpen
+        onClose={() => {}}
+        activeDoc={null}
+        activeTab="files"
+        onTabChange={() => {}}
+        projectId="p1"
+        baseBranch="master"
+        filesBranchCardId="card-1"
+        onFilesBranchChange={() => {}}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Switch to master branch" })).toBeInTheDocument();
+    expect(screen.getByText("Show master")).toBeInTheDocument();
+    expect(screen.queryByText("Show main")).not.toBeInTheDocument();
   });
 });
