@@ -10,3 +10,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # pnpm/action-setup v6 ignores the explicit `version: 10` input and
+      # bootstraps pnpm v11, breaking `pnpm install --frozen-lockfile`
+      # (pnpm/action-setup#225, #227). Stay on v5 until resolved.
+      - dependency-name: "pnpm/action-setup"
+        versions: [">=6"]
