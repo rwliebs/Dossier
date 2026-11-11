@@ -16,10 +16,7 @@ const LOOPBACK_HOST = "127.0.0.1";
 function canBind(candidate, host) {
   return new Promise((resolve) => {
     const probe = createServer();
-    probe.once("error", (e) => {
-      console.error(`DBG canBind candidate=${candidate} host=${host} code=${e.code} msg=${e.message}`);
-      resolve(false);
-    });
+    probe.once("error", () => resolve(false));
     probe.once("listening", () => probe.close(() => resolve(true)));
     probe.listen(candidate, host);
   });
@@ -31,10 +28,13 @@ function canBind(candidate, host) {
  * 127.0.0.1 doesn't block a 0.0.0.0 bind, but it would shadow localhost.
  */
 export async function isPortFree(candidate) {
-  const results = await Promise.all(
-    [BIND_HOST, LOOPBACK_HOST].map((host) => canBind(candidate, host))
-  );
-  return results.every(Boolean);
+  // Probe one host at a time. On Linux a listener on 0.0.0.0:P and a bind to
+  // 127.0.0.1:P conflict, so probing both concurrently makes every port look
+  // taken (the probe that listens first blocks the other).
+  for (const host of [BIND_HOST, LOOPBACK_HOST]) {
+    if (!(await canBind(candidate, host))) return false;
+  }
+  return true;
 }
 
 /**
