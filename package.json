@@ -170,5 +170,10 @@
     "@tootallnate/once": ">=3.0.1",
     "http-proxy-agent": ">=7.0.0",
     "better-sqlite3": "$better-sqlite3"
+  },
+  "pnpm": {
+    "overrides": {
+      "better-sqlite3": "$better-sqlite3"
+    }
   }
 }
