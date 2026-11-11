@@ -14,19 +14,40 @@ import { join } from "node:path";
 import { spawn, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { DEFAULT_PORT, BIND_HOST, findAvailablePort } from "./port.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
+
+// Port selection lives in ./port.mjs; this just applies the result or exits.
+async function resolvePort() {
+  try {
+    const result = await findAvailablePort({ port, explicit: portExplicit });
+    port = result.port;
+    movedFromPort = result.movedFromPort;
+  } catch (err) {
+    console.error(`  ${err.message}`);
+    process.exit(1);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Parse CLI args
 // ---------------------------------------------------------------------------
 const args = process.argv.slice(2);
-let port = 3000;
+let port = DEFAULT_PORT;
+let portExplicit = false;
+let movedFromPort = null;
 let noBrowser = false;
 
 for (let i = 0; i < args.length; i++) {
   if ((args[i] === "--port" || args[i] === "-p") && args[i + 1]) {
-    port = parseInt(args[i + 1], 10);
+    const raw = args[i + 1];
+    port = Number(raw);
+    portExplicit = true;
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      console.error(`  Invalid port "${raw}". Use a number from 1 to 65535.`);
+      process.exit(1);
+    }
     i++;
   } else if (args[i] === "--no-open") {
     noBrowser = true;
@@ -38,7 +59,7 @@ for (let i = 0; i < args.length; i++) {
     npx dossier-agentic-product-planner-builder [options]
 
   Options:
-    --port, -p <number>   Port to listen on (default: 3000)
+    --port, -p <number>   Port to listen on (default: 3000, or the next free port)
     --no-open             Don't open browser automatically
     --help, -h            Show this help message
 `);
@@ -96,6 +117,9 @@ function printBanner(dataDir, isFirstRun) {
   }
 
   console.log(`  Starting on http://localhost:${port}`);
+  if (movedFromPort !== null) {
+    console.log(`  Port ${movedFromPort} is in use, so using ${port} instead.`);
+  }
   console.log(`  Data:   ${dataDir}`);
   console.log("");
 }
@@ -147,6 +171,9 @@ function ensureNativeAddons() {
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
+  // Check the port before any side effects (data dir, native addons, banner).
+  await resolvePort();
+
   ensureNativeAddons();
 
   const dataDir = getDataDir();
@@ -176,7 +203,7 @@ async function main() {
     env: {
       ...process.env,
       PORT: String(port),
-      HOSTNAME: "0.0.0.0",
+      HOSTNAME: BIND_HOST,
       DOSSIER_ALLOW_PROJECT_DEV_SERVER: "1",
     },
     stdio: "inherit",
