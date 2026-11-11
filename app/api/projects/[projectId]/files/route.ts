@@ -219,11 +219,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       let result: { success: boolean; tree?: FileNode[]; error?: string };
       let useWorkingTree = false;
       try {
-        const { execSync } = await import("node:child_process");
-        const currentBranch = execSync("git rev-parse --abbrev-ref HEAD", {
+        const { spawnSync } = await import("node:child_process");
+        const head = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
           cwd: repoPath,
           encoding: "utf-8",
-        }).trim();
+        });
+        if (head.error) throw head.error;
+        if (head.status !== 0) {
+          throw new Error(head.stderr?.trim() || "git rev-parse failed");
+        }
+        const currentBranch = head.stdout.trim();
         useWorkingTree = currentBranch === effectiveBranch;
       } catch {
         useWorkingTree = false;
