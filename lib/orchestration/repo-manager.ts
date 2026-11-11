@@ -260,10 +260,24 @@ export function createFeatureBranch(
   }
 }
 
+/**
+ * Branch names that come from the remote or the project record are only used in
+ * argv arrays (execFileSync), never in a shell string. Still reject anything
+ * outside a conservative charset so odd names fail early.
+ */
+const SAFE_BRANCH_NAME = /^[A-Za-z0-9._/-]+$/;
+function isSafeBranchName(name: string): boolean {
+  return SAFE_BRANCH_NAME.test(name) && !name.startsWith("-") && !name.includes("..");
+}
+
 /** True when refs/remotes/origin/<branch> exists in the local clone (after fetch). */
 function remoteBranchExists(clonePath: string, branch: string): boolean {
+  if (!isSafeBranchName(branch)) return false;
   try {
-    runGitSync(clonePath, `rev-parse --verify --quiet origin/${branch}`);
+    execFileSync("git", ["rev-parse", "--verify", "--quiet", `origin/${branch}`], {
+      cwd: clonePath,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     return true;
   } catch {
     return false;
@@ -277,9 +291,14 @@ function remoteBranchExists(clonePath: string, branch: string): boolean {
  */
 export function getRemoteDefaultBranch(clonePath: string): string | null {
   try {
-    const out = runGitSync(clonePath, "ls-remote --symref origin HEAD");
+    const out = execFileSync("git", ["ls-remote", "--symref", "origin", "HEAD"], {
+      cwd: clonePath,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
     const match = out.match(/^ref: refs\/heads\/(\S+)\s+HEAD$/m);
-    return match?.[1] ?? null;
+    const name = match?.[1] ?? null;
+    return name && isSafeBranchName(name) ? name : null;
   } catch {
     return null;
   }
@@ -333,7 +352,7 @@ export function syncMainBranch(
       };
     }
 
-    execSync(`git checkout -B "${resolvedBranch}" "origin/${resolvedBranch}"`, {
+    execFileSync("git", ["checkout", "-B", resolvedBranch, `origin/${resolvedBranch}`], {
       cwd: clonePath,
       stdio: ["pipe", "pipe", "pipe"],
     });
