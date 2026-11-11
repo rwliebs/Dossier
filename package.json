@@ -92,7 +92,7 @@
     "agent-booster": "^0.2.2",
     "agentic-flow": "2.0.2-alpha",
     "autoprefixer": "^10.4.20",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
@@ -169,11 +169,11 @@
     "cacache": ">=19.0.1",
     "@tootallnate/once": ">=3.0.1",
     "http-proxy-agent": ">=7.0.0",
-    "better-sqlite3": "$better-sqlite3"
+    "better-sqlite3": "^12.11.1"
   },
   "pnpm": {
     "overrides": {
-      "better-sqlite3": "$better-sqlite3"
+      "better-sqlite3": "^12.11.1"
     }
   }
 }
