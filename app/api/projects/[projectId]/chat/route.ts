@@ -141,8 +141,13 @@ export async function POST(
         const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
         if (cloneResult.success && cloneResult.clonePath) {
           const clonePath = cloneResult.clonePath;
+          // Use the branch the remote actually has (e.g. master when saved as main) and correct the project record.
+          const branch = cloneResult.baseBranch ?? baseBranch;
+          if (branch !== baseBranch) {
+            await db.updateProject(projectId, { default_branch: branch });
+          }
           if (rootFolders.length > 0) {
-            const folderResult = createRootFoldersInRepo(clonePath, rootFolders, baseBranch);
+            const folderResult = createRootFoldersInRepo(clonePath, rootFolders, branch);
             if (!folderResult.success) {
               console.warn("[chat] Root folder creation failed:", folderResult.error);
             }
@@ -153,12 +158,12 @@ export async function POST(
           const scaffoldContent = (scaffoldArtifact as { content?: string } | undefined)?.content ?? "";
           const scaffoldFiles = parseScaffoldFiles(scaffoldContent);
           if (scaffoldFiles.length > 0) {
-            const scaffoldResult = writeScaffoldFilesToRepo(clonePath, scaffoldFiles, baseBranch);
+            const scaffoldResult = writeScaffoldFilesToRepo(clonePath, scaffoldFiles, branch);
             if (!scaffoldResult.success) {
               console.warn("[chat] Project scaffold write failed:", scaffoldResult.error);
             }
           }
-          const pushResult = pushBranch(projectId, baseBranch, repoUrl);
+          const pushResult = pushBranch(projectId, branch, repoUrl);
           if (!pushResult.success) {
             console.warn(
               "[chat] Push main (directory structure) to origin failed:",
@@ -278,7 +283,7 @@ export async function POST(
     if (cloneResult.success && cloneResult.clonePath) {
       planningCwd = cloneResult.clonePath;
       if (useScaffold) {
-        repoContext = getRepoContextForPrompt(cloneResult.clonePath, baseBranch);
+        repoContext = getRepoContextForPrompt(cloneResult.clonePath, cloneResult.baseBranch ?? baseBranch);
       }
     }
   }

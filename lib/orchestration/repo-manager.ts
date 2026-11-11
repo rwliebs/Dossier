@@ -96,7 +96,7 @@ export function ensureClone(
   repoUrl: string,
   token?: string | null,
   baseBranch = "main"
-): { success: boolean; clonePath?: string; error?: string } {
+): { success: boolean; clonePath?: string; error?: string; baseBranch?: string } {
   const clonePath = getClonePath(projectId);
   const effectiveToken = token ?? resolveGitHubToken();
   const cloneUrl = repoUrlToCloneUrl(repoUrl, effectiveToken);
@@ -130,9 +130,10 @@ export function ensureClone(
     if (isEmptyRepo(clonePath)) {
       seedEmptyRepo(clonePath, baseBranch);
       // main (or base branch) is pushed during project finalization, when directory structure is committed.
+      return { success: true, clonePath, baseBranch };
     }
 
-    return { success: true, clonePath };
+    return { success: true, clonePath, baseBranch: resolveBaseBranch(clonePath, baseBranch) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
@@ -299,6 +300,16 @@ function remoteBranchExists(clonePath: string, branch: string): boolean {
  * Uses ls-remote instead of refs/remotes/origin/HEAD: that ref is only set at
  * clone time and can be missing or point at a stale branch.
  */
+/**
+ * Returns the branch to build from: the saved name when origin has it, otherwise the remote's
+ * default branch (for example `master` when the project was saved as `main`). Falls back to the
+ * saved name when neither can be determined.
+ */
+export function resolveBaseBranch(clonePath: string, savedBranch: string): string {
+  if (remoteBranchExists(clonePath, savedBranch)) return savedBranch;
+  return getRemoteDefaultBranch(clonePath) ?? savedBranch;
+}
+
 export function getRemoteDefaultBranch(clonePath: string): string | null {
   try {
     const out = execFileSync("git", ["ls-remote", "--symref", "origin", "HEAD"], {
