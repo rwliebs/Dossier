@@ -59,7 +59,7 @@ Create a project.
 {
   "name": "string (required)",
   "repo_url": "string|null (optional)",
-  "default_branch": "string (optional, default: main)"
+  "default_branch": "string (optional, default: main; letters, numbers, ., _, /, - only; no leading '-' or '..')"
 }
 ```
 
@@ -627,12 +627,12 @@ File tree for the project. Two modes via `source` query param.
 
 ### POST /api/projects/[projectId]/repo/sync
 
-Syncs the local clone's base branch with `origin/<default_branch>`.
+Syncs the local clone's base branch with `origin/<default_branch>`. If `origin/<default_branch>` does not exist, the remote's default branch (from `git ls-remote --symref origin HEAD`) is used instead, and the project's `default_branch` is updated to that name.
 
 Use this after merging PRs on GitHub so subsequent builds branch from an up-to-date base.
 
 **Response:**
-- `200` `{ "success": true, "branch": "main" }`
+- `200` `{ "success": true, "branch": "master" }` — `branch` is the branch actually synced; if it differs from the saved `default_branch`, the project record has been corrected.
 
 **Common failures:**
 - `400` project missing repo URL / repo not found

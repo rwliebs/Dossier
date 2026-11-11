@@ -51,13 +51,13 @@ This section is the **current suggested workflow** for the approve → build →
 
 ### What “Sync with GitHub” does and does not do
 
-- **Does**: `git fetch` and reset the local default branch (from project settings, default `main`) to `origin/<that branch>` when that remote ref exists — so the next **build** starts from an up-to-date base on disk.
+- **Does**: `git fetch` and reset the local base branch to `origin/<that branch>` — so the next **build** starts from an up-to-date base on disk. The branch comes from project settings (`default_branch`, which is set from GitHub's default branch when you connect a repo; default `main`). If that branch does not exist on `origin`, Dossier uses the remote's actual default branch (for example `master`) and corrects the project's `default_branch` to match.
 - **Does not**: Re-import or rewrite the story map from the repository; refresh planned-file rows from `main`; or create PRs.
 
 ### Known gaps and sharp edges (March 2026)
 
 - **Upstream / downstream with coders**: GitHub is the system of record for merged code; Dossier is the system of record for intent and structure. Today you bridge them by pushing branches from Dossier and merging on GitHub — not by expecting the map to mirror `main` after every merge.
-- **Default branch name**: If the linked repo uses `master` (or another name) but the project is still set to `main`, sync and some git operations may not match what you expect. Align the project’s default branch with the repo when needed.
+- **Default branch name**: When you connect a repo, Dossier saves the repo's real default branch from GitHub (for example `master`). If a project was saved as `main` but the repo's default is different, **Sync with GitHub** falls back to the remote's default branch and updates the project record. Other git operations (such as builds) still assume the project's `default_branch` is correct, so check it in project settings if builds branch from the wrong base.
 - **PR automation**: Opening the repo after push is supported; **opening or merging PRs from Dossier** is not implemented yet (`PullRequestCandidate` in the DB is not wired to the GitHub API).
 
 Contributors improving this flow should treat the above as **success criteria** for future work: clearer post-merge UX, optional map/repo reconciliation, and/or GitHub API PR helpers — without changing the human gate on merge until product intent says otherwise.
