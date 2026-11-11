@@ -30,3 +30,4 @@ This directory stores Architecture Decision Records (ADRs) for Dossier.
 - [0014 - Releases and Distribution](./0014-releases-and-distribution.md)
 - [0015 - Runnable Project Scaffold](./0015-runnable-project-scaffold.md)
 - [0016 - Planning Agent — Two Authentication Paths](./0016-planning-agent-two-auth-paths.md)
+- [0017 - Planning Timeouts Are Activity-Based, With a Separate Overall Limit](./0017-planning-activity-based-timeouts.md)

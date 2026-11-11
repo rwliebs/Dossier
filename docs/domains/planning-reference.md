@@ -105,6 +105,12 @@ Per-card finalize preconditions (enforced by route):
 - `actions`: PlanningAction[]; optional message
 - `mixed`: Both message and partial actions
 
+### Timeouts (SDK paths)
+- **Idle limit** (default 120 s): restarts on every agent action (tool call, tool result, text turn). Set with `PLANNING_IDLE_TIMEOUT_MS`.
+- **Overall limit** (default 30 min): hard ceiling for one planning call, not reset by activity. Set with `PLANNING_OVERALL_TIMEOUT_MS`.
+- Either limit aborts the run with a `timed out` error that names the last agent action. See [ADR 0017](../adr/0017-planning-activity-based-timeouts.md).
+- CLI subprocess paths still use a fixed 120 s limit.
+
 ---
 
 ## Verification

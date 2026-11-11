@@ -33,6 +33,29 @@ export interface PlanningSdkOptions {
    * uses it instead of process.env. Required when caller passes apiKey override.
    */
   apiKey?: string;
+  /**
+   * Called for every SDK message the agent emits (tool calls, tool results, text turns).
+   * Callers treat agent progress as activity, so a long multi-step run is not mistaken
+   * for a stall. The label is a short, non-sensitive description for diagnostics.
+   */
+  onActivity?: (label: string) => void;
+}
+
+/** Shape of the SDK messages this runner inspects. */
+interface SdkStreamMessage {
+  type?: string;
+  subtype?: string;
+  result?: string;
+  message?: { content?: Array<{ type?: string; text?: string; name?: string }> };
+}
+
+/** Short label for an SDK message: the tool name for tool calls, otherwise the message type. */
+function describeSdkMessage(m: SdkStreamMessage): string {
+  if (m.type === "assistant") {
+    const toolName = m.message?.content?.find((block) => block.type === "tool_use")?.name;
+    return toolName ? `tool ${toolName}` : "assistant message";
+  }
+  return m.type ?? "message";
 }
 
 /**
@@ -97,12 +120,8 @@ export async function runPlanningQuery(options: PlanningSdkOptions): Promise<str
     const next = iter.next();
     const step = abort ? await Promise.race([next, abort]) : await next;
     if (step.done) break;
-    const m = step.value as {
-      type?: string;
-      subtype?: string;
-      result?: string;
-      message?: { content?: Array<{ type?: string; text?: string }> };
-    };
+    const m = step.value as SdkStreamMessage;
+    options.onActivity?.(describeSdkMessage(m));
     if (m.type === "result" && m.subtype === "success" && m.result) {
       finalResult = m.result;
     }
@@ -150,12 +169,8 @@ export async function* streamPlanningQuery(options: PlanningSdkOptions): AsyncGe
     const next = iter.next();
     const step = abort ? await Promise.race([next, abort]) : await next;
     if (step.done) break;
-    const m = step.value as {
-      type?: string;
-      subtype?: string;
-      result?: string;
-      message?: { content?: Array<{ type?: string; text?: string }> };
-    };
+    const m = step.value as SdkStreamMessage;
+    options.onActivity?.(describeSdkMessage(m));
     if (m.type === "result" && m.subtype === "success" && m.result) {
       yield m.result;
     }
