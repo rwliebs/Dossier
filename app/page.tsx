@@ -1112,6 +1112,7 @@ function DossierPageInner() {
               docsList={projectArtifacts ?? []}
               filesBranchCardId={filesBranchCardId}
               onFilesBranchChange={setFilesBranchCardId}
+              baseBranch={snapshot?.project?.default_branch}
               filesBranchCardTitle={
                 filesBranchCardId && snapshot
                   ? snapshot.workflows
