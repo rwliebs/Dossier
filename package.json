@@ -168,6 +168,7 @@
     "make-fetch-happen": ">=14.0.3",
     "cacache": ">=19.0.1",
     "@tootallnate/once": ">=3.0.1",
-    "http-proxy-agent": ">=7.0.0"
+    "http-proxy-agent": ">=7.0.0",
+    "better-sqlite3": "$better-sqlite3"
   }
 }
