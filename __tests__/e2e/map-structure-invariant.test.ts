@@ -11,10 +11,11 @@
  * Requires: dev server running (npm run dev). No LLM needed.
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, expect, beforeAll } from "vitest";
 import {
   BASE_URL,
   canReachServer,
+  itLive,
   createProject,
   seedProjectWithMap,
   seedSecondWorkflow,
@@ -46,13 +47,13 @@ beforeAll(async () => {
 });
 
 describe("map structure invariant (Workflow → Activity → Card)", () => {
-  it.skipIf(!serverUp)("map has correct number of workflows", async () => {
+  itLive(() => serverUp,"map has correct number of workflows", async () => {
     const map = await fetchMapSnapshot(projectId);
     expect(map).toBeTruthy();
     expect(map!.workflows.length).toBe(2);
   });
 
-  it.skipIf(!serverUp)("each workflow has activities with cards nested", async () => {
+  itLive(() => serverUp,"each workflow has activities with cards nested", async () => {
     const map = await fetchMapSnapshot(projectId);
     expect(map).toBeTruthy();
 
@@ -69,7 +70,7 @@ describe("map structure invariant (Workflow → Activity → Card)", () => {
     }
   });
 
-  it.skipIf(!serverUp)("cards have required fields (id, title)", async () => {
+  itLive(() => serverUp,"cards have required fields (id, title)", async () => {
     const map = await fetchMapSnapshot(projectId);
     const allCards = getAllCards(map!);
     expect(allCards.length).toBeGreaterThanOrEqual(2);
@@ -81,14 +82,14 @@ describe("map structure invariant (Workflow → Activity → Card)", () => {
     }
   });
 
-  it.skipIf(!serverUp)("workflow IDs match seeded values", async () => {
+  itLive(() => serverUp,"workflow IDs match seeded values", async () => {
     const map = await fetchMapSnapshot(projectId);
     const wfIds = map!.workflows.map((wf) => wf.id);
     expect(wfIds).toContain(firstWorkflowId);
     expect(wfIds).toContain(secondWorkflowId);
   });
 
-  it.skipIf(!serverUp)("adding a card via actions appears in map snapshot", async () => {
+  itLive(() => serverUp,"adding a card via actions appears in map snapshot", async () => {
     const newCardId = crypto.randomUUID();
     const res = await fetch(`${BASE_URL}/api/projects/${projectId}/actions`, {
       method: "POST",
@@ -121,7 +122,7 @@ describe("map structure invariant (Workflow → Activity → Card)", () => {
     expect(found!.title).toBe("Login Form");
   });
 
-  it.skipIf(!serverUp)("deleting a card via actions removes it from map", async () => {
+  itLive(() => serverUp,"deleting a card via actions removes it from map", async () => {
     const res = await fetch(`${BASE_URL}/api/projects/${projectId}/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -145,7 +146,7 @@ describe("map structure invariant (Workflow → Activity → Card)", () => {
     expect(found, "deleted card should not appear in map").toBeFalsy();
   });
 
-  it.skipIf(!serverUp)("project refreshes retain persisted state", async () => {
+  itLive(() => serverUp,"project refreshes retain persisted state", async () => {
     const snap1 = await fetchMapSnapshot(projectId);
     const snap2 = await fetchMapSnapshot(projectId);
 

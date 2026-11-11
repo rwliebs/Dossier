@@ -11,10 +11,11 @@
  * Requires: dev server running (npm run dev). No LLM needed.
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, expect, beforeAll } from "vitest";
 import {
   BASE_URL,
   canReachServer,
+  itLive,
   createProject,
   seedProjectWithMap,
 } from "./helpers";
@@ -38,7 +39,7 @@ const ITEM_TYPES = ["requirements", "facts", "assumptions", "questions"] as cons
 describe("knowledge items CRUD", () => {
   for (const itemType of ITEM_TYPES) {
     describe(itemType, () => {
-      it.skipIf(!serverUp)(`creates a ${itemType.slice(0, -1)}`, async () => {
+      itLive(() => serverUp,`creates a ${itemType.slice(0, -1)}`, async () => {
         const body: Record<string, unknown> = {
           text: `Test ${itemType.slice(0, -1)}: user can sign up with email`,
           source: "user",
@@ -62,7 +63,7 @@ describe("knowledge items CRUD", () => {
         expect(created.text).toContain("sign up");
       });
 
-      it.skipIf(!serverUp)(`lists ${itemType}`, async () => {
+      itLive(() => serverUp,`lists ${itemType}`, async () => {
         const res = await fetch(
           `${BASE_URL}/api/projects/${projectId}/cards/${cardId}/${itemType}`
         );
@@ -73,7 +74,7 @@ describe("knowledge items CRUD", () => {
         expect(items.length).toBeGreaterThanOrEqual(1);
       });
 
-      it.skipIf(!serverUp)(`updates a ${itemType.slice(0, -1)}`, async () => {
+      itLive(() => serverUp,`updates a ${itemType.slice(0, -1)}`, async () => {
         const listRes = await fetch(
           `${BASE_URL}/api/projects/${projectId}/cards/${cardId}/${itemType}`
         );
@@ -96,7 +97,7 @@ describe("knowledge items CRUD", () => {
         expect(updated.text).toBe(updatedText);
       });
 
-      it.skipIf(!serverUp)(`deletes a ${itemType.slice(0, -1)}`, async () => {
+      itLive(() => serverUp,`deletes a ${itemType.slice(0, -1)}`, async () => {
         const listRes = await fetch(
           `${BASE_URL}/api/projects/${projectId}/cards/${cardId}/${itemType}`
         );
