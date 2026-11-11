@@ -205,6 +205,32 @@ describe("repo-manager", () => {
       }
     });
 
+    it("ensureClone reports the remote default branch when the saved branch is missing", () => {
+      const projectId = "clone-master-default";
+      const dataDir = path.join(tempDir, "dossier-data-clone-master");
+      fs.mkdirSync(dataDir, { recursive: true });
+      const masterRemote = path.join(tempDir, "clone-master-remote");
+      fs.mkdirSync(masterRemote, { recursive: true });
+      execFileSync("git", ["init", "-q", "-b", "master"], { cwd: masterRemote });
+      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: masterRemote });
+      execFileSync("git", ["config", "user.name", "Test"], { cwd: masterRemote });
+      fs.writeFileSync(path.join(masterRemote, "README.md"), "# Master\n", "utf-8");
+      execFileSync("git", ["add", "README.md"], { cwd: masterRemote });
+      execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: masterRemote });
+      const fileUrl = pathToFileURL(masterRemote).href;
+
+      const origEnv = process.env.DOSSIER_DATA_DIR;
+      process.env.DOSSIER_DATA_DIR = dataDir;
+      try {
+        const result = ensureClone(projectId, fileUrl, null, "main");
+        expect(result.success).toBe(true);
+        expect(result.baseBranch).toBe("master");
+      } finally {
+        if (origEnv !== undefined) process.env.DOSSIER_DATA_DIR = origEnv;
+        else delete process.env.DOSSIER_DATA_DIR;
+      }
+    });
+
     it("uses the remote's default branch when the saved branch is missing (master-default repo)", () => {
       const projectId = "sync-master-default";
       const dataDir = path.join(tempDir, "dossier-data-master");

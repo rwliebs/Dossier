@@ -157,6 +157,13 @@ export async function triggerBuild(
   }
   const clonePath = cloneResult.clonePath ?? null;
 
+  // The clone resolves the branch the remote actually has (e.g. master when the project was saved as main).
+  // Build from that branch and correct the project record so later steps agree.
+  const resolvedBaseBranch = cloneResult.baseBranch ?? baseBranch;
+  if (resolvedBaseBranch !== baseBranch) {
+    await db.updateProject(input.project_id, { default_branch: resolvedBaseBranch });
+  }
+
   // Code file creation (planned files) is optional — all finalized cards are buildable
   const runResult = await createRun(db, {
     project_id: input.project_id,
@@ -166,7 +173,7 @@ export async function triggerBuild(
     trigger_type: input.trigger_type,
     initiated_by: input.initiated_by,
     repo_url: repoUrl,
-    base_branch: baseBranch,
+    base_branch: resolvedBaseBranch,
     run_input_snapshot: {
       card_ids: cardIds,
       card_id: input.card_id ?? null,
@@ -219,7 +226,7 @@ export async function triggerBuild(
       const branchResult = createFeatureBranch(
         clonePath,
         featureBranch,
-        baseBranch
+        resolvedBaseBranch
       );
       if (!branchResult.success) {
         // No agent was dispatched for this run: close it so it does not block future builds.
