@@ -5,6 +5,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      # Electron Forge packages share exact internal pins (e.g. plugins pin
+      # plugin-base/shared-types to their own version) and must stay on the
+      # same major. Bump them together in one PR, never one at a time.
+      electron-forge:
+        patterns:
+          - "@electron-forge/*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
