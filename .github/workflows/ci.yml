@@ -1,0 +1,65 @@
+# Verify every PR (and main) installs from the lockfile, lints, tests and builds.
+#
+# Why this exists: lockfile-only changes (e.g. dependabot, overrides) have broken
+# `pnpm install --frozen-lockfile` on main before (#46 duplicate keys, #67 override
+# without a lockfile update). Nothing else checks the merged result.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (install, lint, test, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      # Fails on a broken or out-of-sync lockfile (duplicate keys, overrides mismatch, ...).
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      # repo-reader/repo-manager tests create throwaway repos and commit in them.
+      # They assume a dev machine's git config: a default branch of `main` (e.g. the
+      # Xcode system gitconfig sets it; a runner defaults to `master`) and a global
+      # author identity (a runner has none -> "Author identity unknown").
+      - name: Configure git defaults for tests
+        run: |
+          git config --global init.defaultBranch main
+          git config --global user.name "CI"
+          git config --global user.email "ci@users.noreply.github.com"
+
+      # Tests that need real credentials (e.g. real-Claude e2e) skip themselves when absent.
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
