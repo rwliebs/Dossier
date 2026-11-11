@@ -13,10 +13,11 @@
  * Requires: dev server running (npm run dev). LLM needed only for full finalization.
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, expect, beforeAll } from "vitest";
 import {
   BASE_URL,
   canReachServer,
+  itLive,
   canRunLLMTests,
   createProject,
   seedProjectWithMap,
@@ -40,7 +41,7 @@ beforeAll(async () => {
 });
 
 describe("card finalization and build gating", () => {
-  it.skipIf(!serverUp)(
+  itLive(() => serverUp,
     "finalize rejects card with no requirements",
     async () => {
       const res = await fetch(
@@ -55,7 +56,7 @@ describe("card finalization and build gating", () => {
     }
   );
 
-  it.skipIf(!serverUp)(
+  itLive(() => serverUp,
     "GET finalize package returns card data and empty artifacts",
     async () => {
       const res = await fetch(
@@ -72,7 +73,7 @@ describe("card finalization and build gating", () => {
     }
   );
 
-  it.skipIf(!serverUp)(
+  itLive(() => serverUp,
     "build rejects card without finalized_at",
     async () => {
       const res = await fetch(
@@ -102,7 +103,7 @@ describe("card finalization and build gating", () => {
     }
   );
 
-  it.skipIf(!serverUp)(
+  itLive(() => serverUp,
     "finalize package includes requirements after adding one",
     async () => {
       await createRequirement(projectId, cardId, "User can register with email and password");
@@ -117,7 +118,7 @@ describe("card finalization and build gating", () => {
     }
   );
 
-  it.skipIf(!serverUp)(
+  itLive(() => serverUp,
     "finalize package includes planned files after adding one",
     async () => {
       await createAndApprovePlannedFile(projectId, cardId, "src/signup.tsx");
@@ -131,7 +132,7 @@ describe("card finalization and build gating", () => {
     }
   );
 
-  it.skipIf(!serverUp || !canRunLLMTests())(
+  itLive(() => serverUp && canRunLLMTests(),
     "full finalization sets finalized_at via SSE stream",
     async () => {
       const res = await fetch(

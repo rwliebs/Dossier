@@ -5,6 +5,8 @@
  * and constants so individual E2E test files stay focused on scenario logic.
  */
 
+import { it } from "vitest";
+
 export const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
 export const MARKETPLACE_PROMPT =
@@ -26,6 +28,27 @@ export async function canReachServer(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Drop-in replacement for `it.skipIf(...)` when the condition depends on state
+ * set in `beforeAll` (e.g. `serverUp`).
+ *
+ * `it.skipIf(cond)` evaluates `cond` while the file is being collected, before
+ * `beforeAll` runs, so a flag set there is always `false` and every test is
+ * silently skipped. This helper evaluates `shouldRun` when the test executes
+ * and calls `ctx.skip()` if it returns false, so the skip is reported honestly.
+ */
+export function itLive(
+  shouldRun: () => boolean,
+  name: string,
+  fn: () => Promise<void>,
+  timeout?: number,
+): void {
+  it(name, async (ctx) => {
+    if (!shouldRun()) ctx.skip();
+    await fn();
+  }, timeout);
 }
 
 /** True when GET /api/projects returns a JSON array (Dossier API, not an HTML error page). */

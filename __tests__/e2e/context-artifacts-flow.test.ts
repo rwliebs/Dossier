@@ -11,10 +11,11 @@
  * Requires: dev server running (npm run dev). No LLM needed.
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, expect, beforeAll } from "vitest";
 import {
   BASE_URL,
   canReachServer,
+  itLive,
   createProject,
   seedProjectWithMap,
 } from "./helpers";
@@ -36,7 +37,7 @@ beforeAll(async () => {
 describe("context artifacts flow", () => {
   let artifactId: string;
 
-  it.skipIf(!serverUp)("creates a project-level context artifact", async () => {
+  itLive(() => serverUp,"creates a project-level context artifact", async () => {
     const res = await fetch(`${BASE_URL}/api/projects/${projectId}/artifacts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -55,7 +56,7 @@ describe("context artifacts flow", () => {
     artifactId = created.id;
   });
 
-  it.skipIf(!serverUp)("lists project artifacts", async () => {
+  itLive(() => serverUp,"lists project artifacts", async () => {
     const res = await fetch(
       `${BASE_URL}/api/projects/${projectId}/artifacts`
     );
@@ -67,7 +68,7 @@ describe("context artifacts flow", () => {
     expect(artifacts.some((a: { id: string }) => a.id === artifactId)).toBe(true);
   });
 
-  it.skipIf(!serverUp)("retrieves artifact by ID", async () => {
+  itLive(() => serverUp,"retrieves artifact by ID", async () => {
     const res = await fetch(
       `${BASE_URL}/api/projects/${projectId}/artifacts/${artifactId}`
     );
@@ -78,7 +79,7 @@ describe("context artifacts flow", () => {
     expect(artifact.content).toContain("email/password");
   });
 
-  it.skipIf(!serverUp)("updates an artifact", async () => {
+  itLive(() => serverUp,"updates an artifact", async () => {
     const res = await fetch(
       `${BASE_URL}/api/projects/${projectId}/artifacts/${artifactId}`,
       {
@@ -95,7 +96,7 @@ describe("context artifacts flow", () => {
     expect(updated.content).toContain("Google OAuth");
   });
 
-  it.skipIf(!serverUp)(
+  itLive(() => serverUp,
     "links artifact to card via linkContextArtifact action",
     async () => {
       const res = await fetch(
@@ -124,7 +125,7 @@ describe("context artifacts flow", () => {
     }
   );
 
-  it.skipIf(!serverUp)(
+  itLive(() => serverUp,
     "card's context-artifacts endpoint includes linked artifact",
     async () => {
       const res = await fetch(
@@ -141,7 +142,7 @@ describe("context artifacts flow", () => {
     }
   );
 
-  it.skipIf(!serverUp)("creates artifact via createContextArtifact action", async () => {
+  itLive(() => serverUp,"creates artifact via createContextArtifact action", async () => {
     const res = await fetch(
       `${BASE_URL}/api/projects/${projectId}/actions`,
       {
@@ -178,7 +179,7 @@ describe("context artifacts flow", () => {
     ).toBe(true);
   });
 
-  it.skipIf(!serverUp)("deletes an artifact", async () => {
+  itLive(() => serverUp,"deletes an artifact", async () => {
     const res = await fetch(
       `${BASE_URL}/api/projects/${projectId}/artifacts/${artifactId}`,
       { method: "DELETE" }
