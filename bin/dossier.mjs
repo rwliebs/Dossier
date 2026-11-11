@@ -12,64 +12,22 @@
 import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawn, execSync } from "node:child_process";
-import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { DEFAULT_PORT, BIND_HOST, findAvailablePort } from "./port.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
-const DEFAULT_PORT = 3000;
-// How many ports above the default to try before giving up.
-const PORT_SEARCH_LIMIT = 100;
-// Must match the host the standalone server binds to (HOSTNAME below).
-const BIND_HOST = "0.0.0.0";
-
-// ---------------------------------------------------------------------------
-// Port selection
-// ---------------------------------------------------------------------------
-/**
- * Resolves true if candidate port is free on both the server's bind host and
- * loopback. Checking loopback too matters on macOS: a process bound only to
- * 127.0.0.1 doesn't block a 0.0.0.0 bind, but it would shadow localhost.
- */
-function isPortFree(candidate) {
-  return Promise.all([BIND_HOST, "127.0.0.1"].map((host) => canBind(candidate, host))).then(
-    (results) => results.every(Boolean)
-  );
-}
-
-function canBind(candidate, host) {
-  return new Promise((resolve) => {
-    const probe = createServer();
-    probe.once("error", () => resolve(false));
-    probe.once("listening", () => probe.close(() => resolve(true)));
-    probe.listen(candidate, host);
-  });
-}
-
-/**
- * Ensures `port` is free. Without --port, moves to the next free port and
- * records the original in movedFromPort. With --port, exits with a one-line error.
- */
+// Port selection lives in ./port.mjs; this just applies the result or exits.
 async function resolvePort() {
-  if (await isPortFree(port)) return;
-
-  if (portExplicit) {
-    console.error(`  Port ${port} is already in use. Stop the other process or choose another with --port.`);
+  try {
+    const result = await findAvailablePort({ port, explicit: portExplicit });
+    port = result.port;
+    movedFromPort = result.movedFromPort;
+  } catch (err) {
+    console.error(`  ${err.message}`);
     process.exit(1);
   }
-
-  const requested = port;
-  const last = Math.min(requested + PORT_SEARCH_LIMIT, 65535);
-  for (let candidate = requested + 1; candidate <= last; candidate++) {
-    if (await isPortFree(candidate)) {
-      movedFromPort = requested;
-      port = candidate;
-      return;
-    }
-  }
-  console.error(`  No free port found from ${requested} to ${last}. Stop another instance or use --port.`);
-  process.exit(1);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +171,9 @@ function ensureNativeAddons() {
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
+  // Check the port before any side effects (data dir, native addons, banner).
+  await resolvePort();
+
   ensureNativeAddons();
 
   const dataDir = getDataDir();
@@ -223,8 +184,6 @@ async function main() {
 
   // Load config into process.env before starting the server
   loadConfig();
-
-  await resolvePort();
 
   printBanner(dataDir, isFirstRun);
 
