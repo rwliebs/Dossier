@@ -10,15 +10,19 @@
 
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { execSync, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { getDataDir, ensureDataDir } from "@/lib/config/data-dir";
 import { resolveGitHubToken } from "@/lib/github/resolve-github-token";
 import type { ScaffoldFile } from "./parse-scaffold-files";
 
 const REPOS_DIR = "repos";
 
-function runGitSync(cwd: string, args: string): string {
-  return execSync(`git ${args}`, {
+/**
+ * Runs git with an argv array (no shell). Branch names, URLs, and paths are
+ * passed as separate arguments so they can never be interpreted by a shell.
+ */
+function runGitSync(cwd: string, args: string[]): string {
+  return execFileSync("git", args, {
     cwd,
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "pipe"],
@@ -30,7 +34,7 @@ function runGitSync(cwd: string, args: string): string {
  */
 function isEmptyRepo(clonePath: string): boolean {
   try {
-    runGitSync(clonePath, "rev-parse HEAD");
+    runGitSync(clonePath, ["rev-parse", "HEAD"]);
     return false;
   } catch {
     return true;
@@ -43,16 +47,18 @@ function isEmptyRepo(clonePath: string): boolean {
  * the remote has a main branch to open PRs against.
  */
 function seedEmptyRepo(clonePath: string, baseBranch: string): void {
-  runGitSync(clonePath, `checkout -b ${baseBranch}`);
+  runGitSync(clonePath, ["checkout", "-b", baseBranch]);
   fs.writeFileSync(
     path.join(clonePath, "README.md"),
     "# New Project\n\nInitialized by Dossier.\n"
   );
-  runGitSync(clonePath, "add README.md");
-  runGitSync(
-    clonePath,
-    'commit -m "chore: initialize repository (Dossier)" --author="Dossier <noreply@dossier.dev>"'
-  );
+  runGitSync(clonePath, ["add", "README.md"]);
+  runGitSync(clonePath, [
+    "commit",
+    "-m",
+    "chore: initialize repository (Dossier)",
+    "--author=Dossier <noreply@dossier.dev>",
+  ]);
 }
 
 /**
@@ -111,12 +117,12 @@ export function ensureClone(
           stdio: ["pipe", "pipe", "pipe"],
         });
       }
-      execSync("git fetch origin", {
+      execFileSync("git", ["fetch", "origin"], {
         cwd: clonePath,
         stdio: ["pipe", "pipe", "pipe"],
       });
     } else {
-      execSync(`git clone "${cloneUrl}" "${clonePath}"`, {
+      execFileSync("git", ["clone", cloneUrl, clonePath], {
         stdio: ["pipe", "pipe", "pipe"],
       });
     }
@@ -152,7 +158,7 @@ export function createRootFoldersInRepo(
   if (folders.length === 0) return { success: true };
 
   try {
-    runGitSync(clonePath, `checkout ${baseBranch}`);
+    runGitSync(clonePath, ["checkout", baseBranch]);
 
     for (const folder of folders) {
       const dirPath = path.join(clonePath, folder);
@@ -164,13 +170,15 @@ export function createRootFoldersInRepo(
       }
     }
 
-    runGitSync(clonePath, "add -A");
-    const status = runGitSync(clonePath, "status --porcelain");
+    runGitSync(clonePath, ["add", "-A"]);
+    const status = runGitSync(clonePath, ["status", "--porcelain"]);
     if (status) {
-      runGitSync(
-        clonePath,
-        'commit -m "chore: add root folder structure (Dossier finalization)" --author="Dossier <noreply@dossier.dev>"'
-      );
+      runGitSync(clonePath, [
+        "commit",
+        "-m",
+        "chore: add root folder structure (Dossier finalization)",
+        "--author=Dossier <noreply@dossier.dev>",
+      ]);
     }
 
     return { success: true };
@@ -197,7 +205,7 @@ export function writeScaffoldFilesToRepo(
   if (files.length === 0) return { success: true };
 
   try {
-    runGitSync(clonePath, `checkout ${baseBranch}`);
+    runGitSync(clonePath, ["checkout", baseBranch]);
 
     let written = 0;
     for (const { path: filePath, content } of files) {
@@ -210,13 +218,15 @@ export function writeScaffoldFilesToRepo(
 
     if (written === 0) return { success: true };
 
-    runGitSync(clonePath, "add -A");
-    const status = runGitSync(clonePath, "status --porcelain");
+    runGitSync(clonePath, ["add", "-A"]);
+    const status = runGitSync(clonePath, ["status", "--porcelain"]);
     if (status) {
-      runGitSync(
-        clonePath,
-        'commit -m "chore: add project scaffold (Dossier finalization)" --author="Dossier <noreply@dossier.dev>"'
-      );
+      runGitSync(clonePath, [
+        "commit",
+        "-m",
+        "chore: add project scaffold (Dossier finalization)",
+        "--author=Dossier <noreply@dossier.dev>",
+      ]);
     }
 
     return { success: true };
@@ -242,11 +252,11 @@ export function createFeatureBranch(
   try {
     let baseRef = `origin/${baseBranch}`;
     try {
-      runGitSync(clonePath, `rev-parse --verify ${baseRef}`);
+      runGitSync(clonePath, ["rev-parse", "--verify", baseRef]);
     } catch {
       baseRef = baseBranch;
     }
-    execSync(`git checkout -b "${branchName}" "${baseRef}"`, {
+    execFileSync("git", ["checkout", "-b", branchName, baseRef], {
       cwd: clonePath,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -261,9 +271,54 @@ export function createFeatureBranch(
 }
 
 /**
+ * Branch names that come from the remote or the project record are only used in
+ * argv arrays (execFileSync), never in a shell string. Still reject anything
+ * outside a conservative charset so odd names fail early.
+ */
+const SAFE_BRANCH_NAME = /^[A-Za-z0-9._/-]+$/;
+function isSafeBranchName(name: string): boolean {
+  return SAFE_BRANCH_NAME.test(name) && !name.startsWith("-") && !name.includes("..");
+}
+
+/** True when refs/remotes/origin/<branch> exists in the local clone (after fetch). */
+function remoteBranchExists(clonePath: string, branch: string): boolean {
+  if (!isSafeBranchName(branch)) return false;
+  try {
+    execFileSync("git", ["rev-parse", "--verify", "--quiet", `origin/${branch}`], {
+      cwd: clonePath,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Asks origin which branch its HEAD points to (the remote's default branch).
+ * Uses ls-remote instead of refs/remotes/origin/HEAD: that ref is only set at
+ * clone time and can be missing or point at a stale branch.
+ */
+export function getRemoteDefaultBranch(clonePath: string): string | null {
+  try {
+    const out = execFileSync("git", ["ls-remote", "--symref", "origin", "HEAD"], {
+      cwd: clonePath,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    const match = out.match(/^ref: refs\/heads\/(\S+)\s+HEAD$/m);
+    const name = match?.[1] ?? null;
+    return name && isSafeBranchName(name) ? name : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Syncs the local base branch (e.g. main) with origin.
  * Fetches from origin, then checks out the base branch and resets it to origin/<baseBranch>.
- * If origin/<baseBranch> is missing, falls back to origin/HEAD (the remote's default branch).
+ * If origin/<baseBranch> is missing, uses the remote's default branch (from ls-remote HEAD)
+ * and returns its name in `branch`, so the caller can correct the project's default_branch.
  * Use after merging PRs on GitHub so the Dossier clone's local main is up to date.
  * If the clone does not exist, runs ensureClone first (fetch + optional clone).
  */
@@ -287,39 +342,32 @@ export function syncMainBranch(
   const clonePath = cloneResult.clonePath;
 
   try {
-    let targetRef = `origin/${baseBranch}`;
-    let resolved = false;
+    // Prefer the saved branch. If it is missing on origin, use the remote's
+    // actual default branch and return its name so the caller can correct the project record.
+    let resolvedBranch: string | null = null;
 
-    try {
-      runGitSync(clonePath, `rev-parse --verify ${targetRef}`);
-      resolved = true;
-    } catch {
-      // origin/<baseBranch> not found — try origin/HEAD to detect remote default
-    }
-
-    if (!resolved) {
-      try {
-        const symref = runGitSync(clonePath, "symbolic-ref refs/remotes/origin/HEAD");
-        targetRef = symref.replace("refs/remotes/", "");
-        resolved = true;
-      } catch {
-        // origin/HEAD not set either
+    if (remoteBranchExists(clonePath, baseBranch)) {
+      resolvedBranch = baseBranch;
+    } else {
+      const remoteDefault = getRemoteDefaultBranch(clonePath);
+      if (remoteDefault && remoteBranchExists(clonePath, remoteDefault)) {
+        resolvedBranch = remoteDefault;
       }
     }
 
-    if (!resolved) {
+    if (!resolvedBranch) {
       return {
         success: false,
         error: `Remote branch "${baseBranch}" not found after fetch. Check that the default branch name in project settings matches your GitHub repository.`,
       };
     }
 
-    execSync(`git checkout -B "${baseBranch}" "${targetRef}"`, {
+    execFileSync("git", ["checkout", "-B", resolvedBranch, `origin/${resolvedBranch}`], {
       cwd: clonePath,
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    return { success: true, branch: baseBranch };
+    return { success: true, branch: resolvedBranch };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
@@ -357,7 +405,7 @@ export function pushBranch(
         stdio: ["pipe", "pipe", "pipe"],
       });
     }
-    execSync(`git push -u origin "${branchName}"`, {
+    execFileSync("git", ["push", "-u", "origin", branchName], {
       cwd: clonePath,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],

@@ -4,6 +4,18 @@ import { json, internalError } from "@/lib/api/response-helpers";
 
 const GITHUB_API = "https://api.github.com";
 
+/**
+ * Branch names from GitHub are stored as project.default_branch and later used in
+ * git commands. Only pass through names with a conservative charset; anything else
+ * is omitted so the client keeps the existing value instead of saving it.
+ */
+function safeDefaultBranch(name: unknown): string | undefined {
+  if (typeof name !== "string") return undefined;
+  return /^[A-Za-z0-9._/-]+$/.test(name) && !name.startsWith("-") && !name.includes("..")
+    ? name
+    : undefined;
+}
+
 /** GET /api/github/repos — list repositories for the authenticated user (uses GITHUB_TOKEN) */
 export async function GET(_request: NextRequest) {
   try {
@@ -43,6 +55,7 @@ export async function GET(_request: NextRequest) {
       html_url: string;
       clone_url: string;
       private: boolean;
+      default_branch: string;
     }>;
 
     const repos = data.map((r) => ({
@@ -50,6 +63,7 @@ export async function GET(_request: NextRequest) {
       html_url: r.html_url,
       clone_url: r.clone_url,
       private: r.private,
+      default_branch: safeDefaultBranch(r.default_branch),
     }));
 
     return json({ repos });
@@ -125,6 +139,7 @@ export async function POST(request: NextRequest) {
       html_url: string;
       clone_url: string;
       private: boolean;
+      default_branch: string;
     };
 
     return json({
@@ -132,6 +147,7 @@ export async function POST(request: NextRequest) {
       html_url: repo.html_url,
       clone_url: repo.clone_url,
       private: repo.private,
+      default_branch: safeDefaultBranch(repo.default_branch),
     });
   } catch (err) {
     console.error("POST /api/github/repos error:", err);

@@ -14,6 +14,17 @@ import {
   knowledgeItemSourceSchema,
 } from "@/lib/schemas";
 
+/**
+ * Git branch name supplied by a client. Stored as project.default_branch and
+ * used in git commands, so keep it to a conservative charset.
+ */
+const gitBranchNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(/^[A-Za-z0-9._/-]+$/, "Branch name may only contain letters, numbers, ., _, /, -")
+  .refine((n) => !n.startsWith("-") && !n.includes(".."), "Invalid branch name");
+
 // Project create/update
 export const createProjectSchema = z.object({
   name: z.string().min(1),
@@ -23,7 +34,7 @@ export const createProjectSchema = z.object({
   deployment: z.string().nullable().optional(),
   design_inspiration: z.string().nullable().optional(),
   repo_url: z.string().url().nullable().optional(),
-  default_branch: z.string().min(1).optional(),
+  default_branch: gitBranchNameSchema.optional(),
 });
 
 export const updateProjectSchema = z.object({
@@ -34,7 +45,7 @@ export const updateProjectSchema = z.object({
   deployment: z.string().nullable().optional(),
   design_inspiration: z.string().nullable().optional(),
   repo_url: z.string().url().nullable().optional(),
-  default_branch: z.string().min(1).optional(),
+  default_branch: gitBranchNameSchema.optional(),
 });
 
 // Action submission
