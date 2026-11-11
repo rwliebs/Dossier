@@ -7,6 +7,11 @@
  *
  * Usage: node scripts/delete-test-projects.mjs
  *        SQLITE_PATH=/path/to/dossier.db node scripts/delete-test-projects.mjs
+ *
+ * Operator maintenance tool. It runs raw SQL against better-sqlite3 directly,
+ * outside the DB adapter in lib/db. This is an accepted exception to the
+ * adapter seam: it's a one-off cleanup tool, not business logic. Keep it to
+ * maintenance; app code must go through lib/db.
  */
 
 import { join } from "node:path";
