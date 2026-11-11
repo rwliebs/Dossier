@@ -47,6 +47,13 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      # repo-reader/repo-manager tests create throwaway repos with a bare `git init`
+      # and then refer to a branch named `main`. Dev machines set
+      # init.defaultBranch=main (e.g. the Xcode system gitconfig); a runner defaults
+      # to `master`, so those tests fail without this.
+      - name: Configure git defaults for tests
+        run: git config --global init.defaultBranch main
+
       # Tests that need real credentials (e.g. real-Claude e2e) skip themselves when absent.
       - name: Test
         run: pnpm run test
