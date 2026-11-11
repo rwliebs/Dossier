@@ -40,6 +40,7 @@ jobs:
         run: pnpm run build
 
       - name: Publish to npm
-        run: npm publish --no-git-checks
+        run: npm publish
         # Publishes to 'latest' so `npm i dossier-agentic-product-planner-builder` gets this version.
         # OIDC auth when this workflow is registered as a Trusted Publisher on npm.
+        # Do not pass --no-git-checks: that is a pnpm flag; npm 12+ errors on unknown CLI flags.
