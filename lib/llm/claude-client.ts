@@ -19,6 +19,116 @@ export function isLikelyApiKey(credential: string): boolean {
 }
 const DEFAULT_TIMEOUT_MS = 120_000;
 
+/**
+ * SDK paths: silence allowed between agent actions. The timer restarts on every SDK message
+ * (tool call, tool result, text turn), so reading files does not count as idle.
+ * Override with PLANNING_IDLE_TIMEOUT_MS or the `timeoutMs` option.
+ */
+const DEFAULT_IDLE_TIMEOUT_MS = 120_000;
+
+/**
+ * SDK paths: hard ceiling for one planning call, however active the agent is.
+ * Override with PLANNING_OVERALL_TIMEOUT_MS or the `overallTimeoutMs` option.
+ */
+const DEFAULT_OVERALL_TIMEOUT_MS = 30 * 60_000;
+
+function readPositiveMsEnv(name: string): number | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/** Resolves the idle and overall limits for an SDK planning call. Explicit options win over env. */
+function resolvePlanningLimits(options?: { timeoutMs?: number; overallTimeoutMs?: number }): {
+  idleMs: number;
+  overallMs: number;
+} {
+  return {
+    idleMs: options?.timeoutMs ?? readPositiveMsEnv("PLANNING_IDLE_TIMEOUT_MS") ?? DEFAULT_IDLE_TIMEOUT_MS,
+    overallMs:
+      options?.overallTimeoutMs ?? readPositiveMsEnv("PLANNING_OVERALL_TIMEOUT_MS") ?? DEFAULT_OVERALL_TIMEOUT_MS,
+  };
+}
+
+interface PlanningWatchdog {
+  /** Rejects with the limit error as soon as the idle or overall limit fires. */
+  expired: Promise<never>;
+  /** The limit error that ended the call, if a limit has fired. */
+  readonly firedError: Error | undefined;
+  /** Restarts the idle timer. The label describes the agent action for error messages. */
+  touch(label?: string): void;
+  /** Clears both timers. Call once the call has settled. */
+  stop(): void;
+}
+
+/**
+ * Tracks agent activity for one SDK planning call. The idle timer restarts on every touch();
+ * the overall timer is set once and never restarts. Whichever limit fires first calls onExpire
+ * (which aborts the SDK run) and rejects `expired`.
+ */
+function createPlanningWatchdog(
+  limits: { idleMs: number; overallMs: number },
+  onExpire: () => void,
+): PlanningWatchdog {
+  let lastActivity = "none yet";
+  let firedError: Error | undefined;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  let rejectExpired: (error: Error) => void = () => {};
+
+  const expired = new Promise<never>((_, reject) => {
+    rejectExpired = reject;
+  });
+  // Nothing may be awaiting `expired` when a limit fires; avoid an unhandled rejection.
+  expired.catch(() => {});
+
+  function stop(): void {
+    clearTimeout(idleTimer);
+    clearTimeout(overallTimer);
+  }
+
+  function fire(error: Error): void {
+    if (firedError) return;
+    firedError = error;
+    stop();
+    onExpire();
+    rejectExpired(error);
+  }
+
+  function armIdle(): void {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      fire(
+        new Error(
+          `Planning LLM request timed out after ${limits.idleMs}ms without agent activity (last: ${lastActivity}). Try again.`,
+        ),
+      );
+    }, limits.idleMs);
+  }
+
+  const overallTimer = setTimeout(() => {
+    fire(
+      new Error(
+        `Planning LLM request timed out: overall limit of ${limits.overallMs}ms reached (last: ${lastActivity}). Try again.`,
+      ),
+    );
+  }, limits.overallMs);
+  armIdle();
+
+  return {
+    expired,
+    get firedError() {
+      return firedError;
+    },
+    touch(label?: string) {
+      if (firedError) return;
+      if (label) lastActivity = label;
+      armIdle();
+    },
+    stop,
+  };
+}
+
 const CLI_DEFAULT_MODEL = "claude-sonnet-4-6";
 
 /** Verify the claude binary exists and is authenticated (e.g. Max subscription). */
@@ -272,7 +382,10 @@ export async function claudePlanningRequest(
     apiKey?: string;
     model?: string;
     maxTokens?: number;
+    /** SDK paths: idle limit between agent actions (PLANNING_IDLE_TIMEOUT_MS, default 120s). CLI paths: fixed limit. */
     timeoutMs?: number;
+    /** SDK paths: overall limit for the call (PLANNING_OVERALL_TIMEOUT_MS, default 30 min). */
+    overallTimeoutMs?: number;
     systemPromptOverride?: string;
     userMessageOverride?: string;
     /** Working directory for SDK Read/Glob/Grep tools (e.g. cloned repo path). */
@@ -318,7 +431,7 @@ export async function claudePlanningRequest(
   }
 
   const model = options?.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
-  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const { idleMs, overallMs } = resolvePlanningLimits(options);
 
   const systemPrompt = options?.systemPromptOverride ?? buildPlanningSystemPrompt();
   const history = input.conversationHistory ?? [];
@@ -343,13 +456,7 @@ export async function claudePlanningRequest(
         );
 
   const controller = new AbortController();
-  const timerRef = { id: undefined as ReturnType<typeof setTimeout> | undefined };
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timerRef.id = setTimeout(() => {
-      controller.abort();
-      reject(new DOMException("Aborted", "AbortError"));
-    }, timeoutMs);
-  });
+  const watchdog = createPlanningWatchdog({ idleMs, overallMs }, () => controller.abort());
   try {
     const text = await Promise.race([
       runPlanningQuery({
@@ -359,15 +466,15 @@ export async function claudePlanningRequest(
         signal: controller.signal,
         ...(options?.cwd && { cwd: options.cwd }),
         apiKey: credential,
+        onActivity: (label) => watchdog.touch(label),
       }),
-      timeoutPromise,
+      watchdog.expired,
     ]);
-    clearTimeout(timerRef.id);
     return planningResponseFromSdkText(text, { model });
   } catch (error) {
-    clearTimeout(timerRef.id);
+    if (watchdog.firedError) throw watchdog.firedError;
     if (error && typeof error === "object" && (error as { name?: string }).name === "AbortError") {
-      throw new Error(`Planning LLM request timed out after ${timeoutMs}ms. Try again.`);
+      throw new Error(`Planning LLM request timed out after ${idleMs}ms. Try again.`);
     }
     if (error && typeof error === "object" && "status" in error && (error as { status: number }).status === 429) {
       throw new Error(
@@ -375,6 +482,8 @@ export async function claudePlanningRequest(
       );
     }
     throw error;
+  } finally {
+    watchdog.stop();
   }
 }
 
@@ -382,9 +491,9 @@ export async function claudePlanningRequest(
  * Call Claude API with streaming. Returns a ReadableStream that yields text deltas
  * as they arrive. Used for incremental parsing and live updates.
  *
- * Timeout behaviour: idle-based. The timer resets each time a text chunk arrives,
- * so long-running generations that are actively streaming won't be killed.
- * Only stalls (no data for timeoutMs) trigger an abort.
+ * Timeout behaviour: two limits, see resolvePlanningLimits. The idle limit restarts on every
+ * agent action (SDK message, including tool calls and tool results), so a run that is reading
+ * files is not treated as stalled. The overall limit caps the whole call. Either one aborts the run.
  */
 export async function claudeStreamingRequest(
   input: ClaudeStreamingRequestInput,
@@ -392,7 +501,10 @@ export async function claudeStreamingRequest(
     apiKey?: string;
     model?: string;
     maxTokens?: number;
+    /** SDK paths: idle limit between agent actions (PLANNING_IDLE_TIMEOUT_MS, default 120s). CLI paths: fixed limit. */
     timeoutMs?: number;
+    /** SDK paths: overall limit for the call (PLANNING_OVERALL_TIMEOUT_MS, default 30 min). */
+    overallTimeoutMs?: number;
     /** Working directory for SDK Read/Glob/Grep tools (e.g. cloned repo path). */
     cwd?: string;
   },
@@ -413,10 +525,10 @@ export async function claudeStreamingRequest(
   }
 
   const model = options?.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
-  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const { idleMs, overallMs } = resolvePlanningLimits(options);
 
   const controller = new AbortController();
-  let idleTimer: ReturnType<typeof setTimeout>;
+  const watchdog = createPlanningWatchdog({ idleMs, overallMs }, () => controller.abort());
   return new ReadableStream<string>({
     async start(streamController) {
       const iter = streamPlanningQuery({
@@ -426,30 +538,30 @@ export async function claudeStreamingRequest(
         signal: controller.signal,
         ...(options?.cwd && { cwd: options.cwd }),
         apiKey: credential,
+        onActivity: (label) => watchdog.touch(label),
       });
       try {
         while (true) {
-          clearTimeout(idleTimer);
-          const idlePromise = new Promise<never>((_, reject) => {
-            idleTimer = setTimeout(() => {
-              controller.abort();
-              reject(new DOMException("Aborted", "AbortError"));
-            }, timeoutMs);
-          });
-          const result = (await Promise.race([iter.next(), idlePromise])) as IteratorResult<string>;
-          clearTimeout(idleTimer);
+          const result = (await Promise.race([iter.next(), watchdog.expired])) as IteratorResult<string>;
           if (result.done) break;
+          watchdog.touch("final result");
           streamController.enqueue(result.value);
         }
         streamController.close();
       } catch (err) {
-        clearTimeout(idleTimer);
         streamController.error(
-          err && typeof err === "object" && (err as { name?: string }).name === "AbortError"
-            ? new Error(`Planning LLM stream idle for ${timeoutMs}ms with no data. Try again.`)
-            : err,
+          watchdog.firedError ??
+            (err && typeof err === "object" && (err as { name?: string }).name === "AbortError"
+              ? new Error(`Planning LLM stream timed out after ${idleMs}ms. Try again.`)
+              : err),
         );
+      } finally {
+        watchdog.stop();
       }
+    },
+    cancel() {
+      watchdog.stop();
+      controller.abort();
     },
   });
 }
