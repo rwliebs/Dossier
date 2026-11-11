@@ -12,21 +12,84 @@
 import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawn, execSync } from "node:child_process";
+import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
+const DEFAULT_PORT = 3000;
+// How many ports above the default to try before giving up.
+const PORT_SEARCH_LIMIT = 100;
+// Must match the host the standalone server binds to (HOSTNAME below).
+const BIND_HOST = "0.0.0.0";
+
+// ---------------------------------------------------------------------------
+// Port selection
+// ---------------------------------------------------------------------------
+/**
+ * Resolves true if candidate port is free on both the server's bind host and
+ * loopback. Checking loopback too matters on macOS: a process bound only to
+ * 127.0.0.1 doesn't block a 0.0.0.0 bind, but it would shadow localhost.
+ */
+function isPortFree(candidate) {
+  return Promise.all([BIND_HOST, "127.0.0.1"].map((host) => canBind(candidate, host))).then(
+    (results) => results.every(Boolean)
+  );
+}
+
+function canBind(candidate, host) {
+  return new Promise((resolve) => {
+    const probe = createServer();
+    probe.once("error", () => resolve(false));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(candidate, host);
+  });
+}
+
+/**
+ * Ensures `port` is free. Without --port, moves to the next free port and
+ * records the original in movedFromPort. With --port, exits with a one-line error.
+ */
+async function resolvePort() {
+  if (await isPortFree(port)) return;
+
+  if (portExplicit) {
+    console.error(`  Port ${port} is already in use. Stop the other process or choose another with --port.`);
+    process.exit(1);
+  }
+
+  const requested = port;
+  const last = Math.min(requested + PORT_SEARCH_LIMIT, 65535);
+  for (let candidate = requested + 1; candidate <= last; candidate++) {
+    if (await isPortFree(candidate)) {
+      movedFromPort = requested;
+      port = candidate;
+      return;
+    }
+  }
+  console.error(`  No free port found from ${requested} to ${last}. Stop another instance or use --port.`);
+  process.exit(1);
+}
+
 // ---------------------------------------------------------------------------
 // Parse CLI args
 // ---------------------------------------------------------------------------
 const args = process.argv.slice(2);
-let port = 3000;
+let port = DEFAULT_PORT;
+let portExplicit = false;
+let movedFromPort = null;
 let noBrowser = false;
 
 for (let i = 0; i < args.length; i++) {
   if ((args[i] === "--port" || args[i] === "-p") && args[i + 1]) {
-    port = parseInt(args[i + 1], 10);
+    const raw = args[i + 1];
+    port = Number(raw);
+    portExplicit = true;
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      console.error(`  Invalid port "${raw}". Use a number from 1 to 65535.`);
+      process.exit(1);
+    }
     i++;
   } else if (args[i] === "--no-open") {
     noBrowser = true;
@@ -38,7 +101,7 @@ for (let i = 0; i < args.length; i++) {
     npx dossier-agentic-product-planner-builder [options]
 
   Options:
-    --port, -p <number>   Port to listen on (default: 3000)
+    --port, -p <number>   Port to listen on (default: 3000, or the next free port)
     --no-open             Don't open browser automatically
     --help, -h            Show this help message
 `);
@@ -96,6 +159,9 @@ function printBanner(dataDir, isFirstRun) {
   }
 
   console.log(`  Starting on http://localhost:${port}`);
+  if (movedFromPort !== null) {
+    console.log(`  Port ${movedFromPort} is in use, so using ${port} instead.`);
+  }
   console.log(`  Data:   ${dataDir}`);
   console.log("");
 }
@@ -158,6 +224,8 @@ async function main() {
   // Load config into process.env before starting the server
   loadConfig();
 
+  await resolvePort();
+
   printBanner(dataDir, isFirstRun);
 
   // Resolve the standalone server.js
@@ -176,7 +244,7 @@ async function main() {
     env: {
       ...process.env,
       PORT: String(port),
-      HOSTNAME: "0.0.0.0",
+      HOSTNAME: BIND_HOST,
       DOSSIER_ALLOW_PROJECT_DEV_SERVER: "1",
     },
     stdio: "inherit",
