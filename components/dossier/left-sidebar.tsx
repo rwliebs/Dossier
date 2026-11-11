@@ -452,11 +452,16 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
       return;
     }
 
+    // `messages` is the pre-submit snapshot, so the current turn is not included in history.
+    const conversationHistory = messages
+      .slice(-20)
+      .map((m) => ({ role: m.role, content: m.content }));
+
     try {
       const res = await fetch(`/api/projects/${projectId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, conversationHistory }),
       });
 
       const data = await res.json().catch(() => null) as (ChatPreviewResponse & {

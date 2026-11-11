@@ -130,6 +130,14 @@ Use this to set or update project context as you learn about what the user is bu
 - payload: { "id": "<new UUID>", "title": "Card Title", "description": "What to build", "status": "todo", "priority": 1|2|3, "position": 0 }
 - Cards are functionality items under each activity. 3-8 cards per activity.
 
+## updateCard
+Use this to change an existing card (status, title, description, or priority) when the user asks for it.
+- target_ref: { "card_id": "<id of the card from Current Map State>" }
+- payload: include ONLY the fields that change, e.g. { "status": "production" }
+- Valid status values: "todo", "active", "questions", "review", "production".
+- "done", "complete", "completed", "finished", or "shipped" means status "production".
+- To update several cards ("mark those done"), emit one updateCard action per card. Identify the cards from the conversation (what the assistant listed or created) and match them to card ids in Current Map State by title.
+
 ## upsertCardKnowledgeItem (requirements)
 - target_ref: { "card_id": "<the card's id>" }
 - payload: { "item_type": "requirement", "text": "Concrete requirement (e.g. User can filter by category)", "position": 0 }
@@ -879,6 +887,8 @@ export function buildConversationMessages(
   mapSnapshot: PlanningState,
   linkedArtifacts: ContextArtifact[],
   conversationHistory: ConversationMessage[],
+  /** Final user turn. Defaults to the planning user message; pass a scaffold message when building for scaffold mode. */
+  contextMessage: string = buildPlanningUserMessage(userRequest, mapSnapshot, linkedArtifacts),
 ): Array<{ role: "user" | "assistant"; content: string }> {
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
 
@@ -891,14 +901,28 @@ export function buildConversationMessages(
     });
   }
 
-  const contextMessage = buildPlanningUserMessage(
-    userRequest,
-    mapSnapshot,
-    linkedArtifacts,
-  );
   messages.push({ role: "user", content: contextMessage });
 
   return ensureAlternatingRoles(messages);
+}
+
+/**
+ * Render a messages array (from buildConversationMessages) as one prompt string for the
+ * planning SDK/CLI, which accepts a single user message. Prior turns are labelled; the
+ * final User turn carries the current map state and request.
+ */
+export function formatConversationTranscript(
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+): string {
+  const transcript = messages
+    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+    .join("\n\n");
+  return (
+    "## Conversation so far\n" +
+    "The turns below are the earlier conversation (oldest first). The final User turn is the current request. " +
+    "Resolve references such as \"those\", \"these\", \"it\", or \"the last one\" against the earlier turns.\n\n" +
+    transcript
+  );
 }
 
 /**

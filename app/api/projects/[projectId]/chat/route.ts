@@ -6,10 +6,12 @@ import { parsePlanningResponse } from "@/lib/llm/parse-planning-response";
 import { validatePlanningOutput } from "@/lib/llm/validate-planning-output";
 import { pipelineApply } from "@/lib/db/mutations";
 import {
+  buildConversationMessages,
   buildPlanningSystemPrompt,
   buildPlanningUserMessage,
   buildScaffoldSystemPrompt,
   buildScaffoldUserMessage,
+  formatConversationTranscript,
 } from "@/lib/llm/planning-prompt";
 import { runPopulateWorkflow } from "@/lib/llm/run-populate-workflow";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
@@ -86,7 +88,7 @@ export async function POST(
     );
   }
 
-  const { message, mock_response, mode, workflow_id } = parsed.data;
+  const { message, mock_response, mode, workflow_id, conversationHistory } = parsed.data;
 
   let db;
   try {
@@ -284,18 +286,26 @@ export async function POST(
   }
 
   let systemPrompt: string;
-  let userMessage: string;
+  let contextMessage: string;
 
   if (mode === "scaffold") {
     systemPrompt = buildScaffoldSystemPrompt();
-    userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts, repoContext);
+    contextMessage = buildScaffoldUserMessage(message, state, linkedArtifacts, repoContext);
   } else if (hasStructure) {
     systemPrompt = buildPlanningSystemPrompt();
-    userMessage = buildPlanningUserMessage(message, state, linkedArtifacts);
+    contextMessage = buildPlanningUserMessage(message, state, linkedArtifacts);
   } else {
     systemPrompt = buildScaffoldSystemPrompt();
-    userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts, repoContext);
+    contextMessage = buildScaffoldUserMessage(message, state, linkedArtifacts, repoContext);
   }
+
+  // Prior chat turns from the UI, so follow-ups ("now mark those done") resolve against them.
+  const userMessage =
+    conversationHistory.length > 0
+      ? formatConversationTranscript(
+          buildConversationMessages(message, state, linkedArtifacts, conversationHistory, contextMessage),
+        )
+      : contextMessage;
 
   // --- LLM call ---
   const useMock =
