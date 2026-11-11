@@ -16,7 +16,29 @@ import {
   getProject,
 } from "@/lib/db/queries";
 import { listOrchestrationRunsByProject } from "@/lib/db/queries/orchestration";
-import { recoverStaleRuns } from "./recover-stale-runs";
+import { recoverStaleRuns, abandonStaleQueuedRuns } from "./recover-stale-runs";
+
+/** Error text SQLite reports when the one-active-run-per-project partial unique index rejects an insert. */
+const ACTIVE_RUN_CONFLICT_MARKER = "UNIQUE constraint failed: orchestration_run.project_id";
+
+function buildInProgressResult(): TriggerBuildResult {
+  return {
+    success: false,
+    error: "Build in progress",
+    validationErrors: ["A build is already running for this project. Wait for it to complete."],
+    outcomeType: "error",
+    message: "A build is already running for this project. Wait for it to complete.",
+  };
+}
+
+/** A project has an active run when a run is queued (not yet dispatched) or running. */
+async function hasActiveRun(db: DbAdapter, projectId: string): Promise<boolean> {
+  for (const status of ["running", "queued"] as const) {
+    const runs = await listOrchestrationRunsByProject(db, projectId, { status, limit: 1 });
+    if (runs.length > 0) return true;
+  }
+  return false;
+}
 
 export interface TriggerBuildInput {
   project_id: string;
@@ -48,18 +70,9 @@ export async function triggerBuild(
   // O10.6: Single-build lock — strategy-mandated safety
   // Optionally recover runs stuck in "running" (set DOSSIER_STALE_RUN_MINUTES > 0).
   await recoverStaleRuns(db, input.project_id);
-  const stillRunning = await listOrchestrationRunsByProject(db, input.project_id, {
-    status: "running",
-    limit: 1,
-  });
-  if (stillRunning.length > 0) {
-    return {
-      success: false,
-      error: "Build in progress",
-      validationErrors: ["A build is already running for this project. Wait for it to complete."],
-      outcomeType: "error",
-      message: "A build is already running for this project. Wait for it to complete.",
-    };
+  await abandonStaleQueuedRuns(db, input.project_id);
+  if (await hasActiveRun(db, input.project_id)) {
+    return buildInProgressResult();
   }
 
   const project = await getProject(db, input.project_id);
@@ -164,6 +177,10 @@ export async function triggerBuild(
   });
 
   if (!runResult.success) {
+    // A concurrent trigger inserted an active run between our check and insert: the index rejected this one.
+    if (runResult.error?.includes(ACTIVE_RUN_CONFLICT_MARKER)) {
+      return buildInProgressResult();
+    }
     return {
       success: false,
       error: runResult.error,
@@ -205,6 +222,13 @@ export async function triggerBuild(
         baseBranch
       );
       if (!branchResult.success) {
+        // No agent was dispatched for this run: close it so it does not block future builds.
+        if (assignmentIds.length === 0) {
+          await db.updateOrchestrationRun(runId, {
+            status: "failed",
+            ended_at: new Date().toISOString(),
+          });
+        }
         return {
           success: false,
           error: branchResult.error,
