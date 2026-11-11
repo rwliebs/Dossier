@@ -18,22 +18,16 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { execSync } from "node:child_process";
+import { readConfigFile } from "@/lib/config/data-dir";
 
 const TIMEOUT = 300_000; // 5 minutes — real Claude execution
 
 function canRunRealBuild(): boolean {
   try {
-    const configPath = path.join(
-      process.env.HOME ?? process.env.USERPROFILE ?? ".",
-      ".dossier",
-      "config"
-    );
+    // Same lookup the client uses (env, then the data-dir config), so the gate
+    // and the client can't disagree about whether a key is available.
     const hasKeyInEnv = !!process.env.ANTHROPIC_API_KEY?.trim();
-    let hasKeyInConfig = false;
-    if (fs.existsSync(configPath)) {
-      const content = fs.readFileSync(configPath, "utf-8");
-      hasKeyInConfig = content.includes("ANTHROPIC_API_KEY");
-    }
+    const hasKeyInConfig = !!readConfigFile().ANTHROPIC_API_KEY?.trim();
     if (!hasKeyInEnv && !hasKeyInConfig) return false;
 
     const distRoot = path.join(
@@ -76,6 +70,13 @@ describe("Build button → file creation (real system test)", () => {
     // Create a bare git repo to act as the "remote"
     fs.mkdirSync(bareRepoPath);
     execSync("git init --bare", { cwd: bareRepoPath, stdio: "pipe" });
+
+    // The client resolves the key from env or the data-dir config. Capture it
+    // from the real config before DOSSIER_DATA_DIR points at an empty temp dir.
+    if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+      const key = readConfigFile().ANTHROPIC_API_KEY?.trim();
+      if (key) process.env.ANTHROPIC_API_KEY = key;
+    }
 
     // Point DOSSIER_DATA_DIR to temp so clone goes there
     savedDataDir = process.env.DOSSIER_DATA_DIR;
