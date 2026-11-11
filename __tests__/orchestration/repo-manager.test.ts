@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import {
   getClonePath,
   repoUrlToCloneUrl,
@@ -199,6 +199,71 @@ describe("repo-manager", () => {
         const result = syncMainBranch(projectId, fileUrl, "nonexistent");
         expect(result.success).toBe(false);
         expect(result.error).toContain("not found");
+      } finally {
+        if (origEnv !== undefined) process.env.DOSSIER_DATA_DIR = origEnv;
+        else delete process.env.DOSSIER_DATA_DIR;
+      }
+    });
+
+    it("uses the remote's default branch when the saved branch is missing (master-default repo)", () => {
+      const projectId = "sync-master-default";
+      const dataDir = path.join(tempDir, "dossier-data-master");
+      fs.mkdirSync(dataDir, { recursive: true });
+      const masterRemote = path.join(tempDir, "master-remote");
+      fs.mkdirSync(masterRemote, { recursive: true });
+      execFileSync("git", ["init", "-q", "-b", "master"], { cwd: masterRemote });
+      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: masterRemote });
+      execFileSync("git", ["config", "user.name", "Test"], { cwd: masterRemote });
+      fs.writeFileSync(path.join(masterRemote, "README.md"), "# Master\n", "utf-8");
+      execFileSync("git", ["add", "README.md"], { cwd: masterRemote });
+      execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: masterRemote });
+      const fileUrl = pathToFileURL(masterRemote).href;
+
+      const origEnv = process.env.DOSSIER_DATA_DIR;
+      process.env.DOSSIER_DATA_DIR = dataDir;
+      try {
+        const result = syncMainBranch(projectId, fileUrl, "main");
+        expect(result.success).toBe(true);
+        expect(result.branch).toBe("master");
+
+        const clonePath = getClonePath(projectId);
+        expect(fs.existsSync(path.join(clonePath, "README.md"))).toBe(true);
+        const current = execFileSync("git", ["branch", "--show-current"], {
+          cwd: clonePath,
+          encoding: "utf-8",
+        }).trim();
+        expect(current).toBe("master");
+      } finally {
+        if (origEnv !== undefined) process.env.DOSSIER_DATA_DIR = origEnv;
+        else delete process.env.DOSSIER_DATA_DIR;
+      }
+    });
+
+    it("does not execute shell syntax embedded in a remote default branch name", () => {
+      const projectId = "sync-branch-injection";
+      const dataDir = path.join(tempDir, "dossier-data-injection");
+      fs.mkdirSync(dataDir, { recursive: true });
+      const evilRemote = path.join(tempDir, "evil-remote");
+      fs.mkdirSync(evilRemote, { recursive: true });
+      execFileSync("git", ["init", "-q", "-b", "master"], { cwd: evilRemote });
+      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: evilRemote });
+      execFileSync("git", ["config", "user.name", "Test"], { cwd: evilRemote });
+      execFileSync("git", ["commit", "-q", "--allow-empty", "-m", "init"], { cwd: evilRemote });
+      // Git allows $, (, ), > in branch names (but not ':' or spaces). If the name reaches a shell, the marker file is created.
+      const marker = path.join(tempDir, "pwned-marker");
+      const evilBranch = `x$(>${marker})`;
+      execFileSync("git", ["branch", evilBranch], { cwd: evilRemote });
+      execFileSync("git", ["symbolic-ref", "HEAD", `refs/heads/${evilBranch}`], { cwd: evilRemote });
+      // Remove 'master' so the remote has no 'main' and no 'master': only the malicious default branch exists.
+      execFileSync("git", ["branch", "-D", "master"], { cwd: evilRemote });
+      const fileUrl = pathToFileURL(evilRemote).href;
+
+      const origEnv = process.env.DOSSIER_DATA_DIR;
+      process.env.DOSSIER_DATA_DIR = dataDir;
+      try {
+        const result = syncMainBranch(projectId, fileUrl, "main");
+        expect(result.success).toBe(false);
+        expect(fs.existsSync(marker)).toBe(false);
       } finally {
         if (origEnv !== undefined) process.env.DOSSIER_DATA_DIR = origEnv;
         else delete process.env.DOSSIER_DATA_DIR;

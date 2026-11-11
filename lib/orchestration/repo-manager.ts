@@ -10,15 +10,19 @@
 
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { execSync, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { getDataDir, ensureDataDir } from "@/lib/config/data-dir";
 import { resolveGitHubToken } from "@/lib/github/resolve-github-token";
 import type { ScaffoldFile } from "./parse-scaffold-files";
 
 const REPOS_DIR = "repos";
 
-function runGitSync(cwd: string, args: string): string {
-  return execSync(`git ${args}`, {
+/**
+ * Runs git with an argv array (no shell). Branch names, URLs, and paths are
+ * passed as separate arguments so they can never be interpreted by a shell.
+ */
+function runGitSync(cwd: string, args: string[]): string {
+  return execFileSync("git", args, {
     cwd,
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "pipe"],
@@ -30,7 +34,7 @@ function runGitSync(cwd: string, args: string): string {
  */
 function isEmptyRepo(clonePath: string): boolean {
   try {
-    runGitSync(clonePath, "rev-parse HEAD");
+    runGitSync(clonePath, ["rev-parse", "HEAD"]);
     return false;
   } catch {
     return true;
@@ -43,16 +47,18 @@ function isEmptyRepo(clonePath: string): boolean {
  * the remote has a main branch to open PRs against.
  */
 function seedEmptyRepo(clonePath: string, baseBranch: string): void {
-  runGitSync(clonePath, `checkout -b ${baseBranch}`);
+  runGitSync(clonePath, ["checkout", "-b", baseBranch]);
   fs.writeFileSync(
     path.join(clonePath, "README.md"),
     "# New Project\n\nInitialized by Dossier.\n"
   );
-  runGitSync(clonePath, "add README.md");
-  runGitSync(
-    clonePath,
-    'commit -m "chore: initialize repository (Dossier)" --author="Dossier <noreply@dossier.dev>"'
-  );
+  runGitSync(clonePath, ["add", "README.md"]);
+  runGitSync(clonePath, [
+    "commit",
+    "-m",
+    "chore: initialize repository (Dossier)",
+    "--author=Dossier <noreply@dossier.dev>",
+  ]);
 }
 
 /**
@@ -111,12 +117,12 @@ export function ensureClone(
           stdio: ["pipe", "pipe", "pipe"],
         });
       }
-      execSync("git fetch origin", {
+      execFileSync("git", ["fetch", "origin"], {
         cwd: clonePath,
         stdio: ["pipe", "pipe", "pipe"],
       });
     } else {
-      execSync(`git clone "${cloneUrl}" "${clonePath}"`, {
+      execFileSync("git", ["clone", cloneUrl, clonePath], {
         stdio: ["pipe", "pipe", "pipe"],
       });
     }
@@ -152,7 +158,7 @@ export function createRootFoldersInRepo(
   if (folders.length === 0) return { success: true };
 
   try {
-    runGitSync(clonePath, `checkout ${baseBranch}`);
+    runGitSync(clonePath, ["checkout", baseBranch]);
 
     for (const folder of folders) {
       const dirPath = path.join(clonePath, folder);
@@ -164,13 +170,15 @@ export function createRootFoldersInRepo(
       }
     }
 
-    runGitSync(clonePath, "add -A");
-    const status = runGitSync(clonePath, "status --porcelain");
+    runGitSync(clonePath, ["add", "-A"]);
+    const status = runGitSync(clonePath, ["status", "--porcelain"]);
     if (status) {
-      runGitSync(
-        clonePath,
-        'commit -m "chore: add root folder structure (Dossier finalization)" --author="Dossier <noreply@dossier.dev>"'
-      );
+      runGitSync(clonePath, [
+        "commit",
+        "-m",
+        "chore: add root folder structure (Dossier finalization)",
+        "--author=Dossier <noreply@dossier.dev>",
+      ]);
     }
 
     return { success: true };
@@ -197,7 +205,7 @@ export function writeScaffoldFilesToRepo(
   if (files.length === 0) return { success: true };
 
   try {
-    runGitSync(clonePath, `checkout ${baseBranch}`);
+    runGitSync(clonePath, ["checkout", baseBranch]);
 
     let written = 0;
     for (const { path: filePath, content } of files) {
@@ -210,13 +218,15 @@ export function writeScaffoldFilesToRepo(
 
     if (written === 0) return { success: true };
 
-    runGitSync(clonePath, "add -A");
-    const status = runGitSync(clonePath, "status --porcelain");
+    runGitSync(clonePath, ["add", "-A"]);
+    const status = runGitSync(clonePath, ["status", "--porcelain"]);
     if (status) {
-      runGitSync(
-        clonePath,
-        'commit -m "chore: add project scaffold (Dossier finalization)" --author="Dossier <noreply@dossier.dev>"'
-      );
+      runGitSync(clonePath, [
+        "commit",
+        "-m",
+        "chore: add project scaffold (Dossier finalization)",
+        "--author=Dossier <noreply@dossier.dev>",
+      ]);
     }
 
     return { success: true };
@@ -242,11 +252,11 @@ export function createFeatureBranch(
   try {
     let baseRef = `origin/${baseBranch}`;
     try {
-      runGitSync(clonePath, `rev-parse --verify ${baseRef}`);
+      runGitSync(clonePath, ["rev-parse", "--verify", baseRef]);
     } catch {
       baseRef = baseBranch;
     }
-    execSync(`git checkout -b "${branchName}" "${baseRef}"`, {
+    execFileSync("git", ["checkout", "-b", branchName, baseRef], {
       cwd: clonePath,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -395,7 +405,7 @@ export function pushBranch(
         stdio: ["pipe", "pipe", "pipe"],
       });
     }
-    execSync(`git push -u origin "${branchName}"`, {
+    execFileSync("git", ["push", "-u", "origin", branchName], {
       cwd: clonePath,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
