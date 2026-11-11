@@ -5,6 +5,11 @@
  * If run_id is omitted, marks the most recent running run for the project that has one.
  *
  * Requires: SQLITE_PATH or ~/.dossier/dossier.db
+ *
+ * Operator maintenance tool. It runs raw SQL against better-sqlite3 directly,
+ * outside the DB adapter in lib/db. This is an accepted exception to the
+ * adapter seam: it's a one-off repair tool, not business logic. Keep it to
+ * maintenance; app code must go through lib/db.
  */
 
 import { existsSync } from "fs";
