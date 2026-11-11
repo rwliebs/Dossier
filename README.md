@@ -1,10 +1,16 @@
 # DOSSIER
 
+[![npm version](https://img.shields.io/npm/v/dossier-agentic-product-planner-builder.svg)](https://www.npmjs.com/package/dossier-agentic-product-planner-builder)
+[![npm downloads](https://img.shields.io/npm/dt/dossier-agentic-product-planner-builder.svg)](https://www.npmjs.com/package/dossier-agentic-product-planner-builder)
+[![License: PolyForm Shield](https://img.shields.io/badge/license-PolyForm%20Shield-blue.svg)](LICENSE)
+
 **Out of the weeds. Back to crafting products.**
 
 Dossier is an AI-native product building platform. It gives you a living map of your entire product — structured, visible, and agent-ready — so you can stay focused on the product vision while your agents build the details.
 
 You've learned to build with AI. Dossier is what comes next.
+
+**Latest release: [v0.6.0](https://github.com/rwliebs/Dossier/releases/tag/v0.6.0)** — already installed? Upgrade with `npm i -g dossier-agentic-product-planner-builder@latest`.
 
 ---
 
@@ -121,13 +127,18 @@ OrchestrationRun also has → RunCheck, ApprovalRequest, PullRequestCandidate
 
 **Install from npm (Node 20+):**
 ```bash
-npm i -g dossier-agentic-product-planner-builder
+npm i -g dossier-agentic-product-planner-builder@latest
 dossier
+```
+
+**Already on an older version?** Reinstall to pick up `0.6.0`:
+```bash
+npm i -g dossier-agentic-product-planner-builder@latest
 ```
 
 **Or try without installing:**
 ```bash
-npx dossier-agentic-product-planner-builder
+npx dossier-agentic-product-planner-builder@latest
 ```
 
 **Or from source:**

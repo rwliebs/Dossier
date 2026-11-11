@@ -50,7 +50,8 @@ docs/
 │   └── multi-agent-swarm.md
 │
 ├── releases/                 # Release notes
-│   └── v0.5.0-release-notes.md
+│   ├── v0.5.0-release-notes.md
+│   └── v0.6.0-release-notes.md
 │
 ├── investigations/           # Bug investigations (TTL: 2 weeks)
 │   └── (active reports)
