@@ -8,7 +8,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { triggerBuild } from "@/lib/orchestration/trigger-build";
 import * as orchestrationQueries from "@/lib/db/queries/orchestration";
 import * as queries from "@/lib/db/queries";
+import * as createRunModule from "@/lib/orchestration/create-run";
 import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
+
+vi.mock("@/lib/orchestration/create-run", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/orchestration/create-run")>();
+  return { ...actual, createRun: vi.fn(actual.createRun) };
+});
 
 const projectId = "11111111-1111-1111-1111-111111111111";
 const workflowId = "22222222-2222-2222-2222-222222222222";
@@ -107,6 +113,133 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     expect(result.error).toBe("Build in progress");
     expect(result.validationErrors).toContain(
       "A build is already running for this project. Wait for it to complete."
+    );
+  });
+
+  it("rejects when a run is queued but not yet dispatched", async () => {
+    vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockImplementation(
+      async (_db, _projectId, options) =>
+        options?.status === "queued"
+          ? ([{ id: "run-q", project_id: projectId, status: "queued", created_at: new Date().toISOString() }] as never)
+          : ([] as never)
+    );
+
+    const mockDb = createMockDbAdapter();
+    const result = await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "workflow",
+      workflow_id: workflowId,
+      trigger_type: "workflow",
+      initiated_by: "user",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Build in progress");
+  });
+
+  it("clears an abandoned queued run older than the timeout and proceeds", async () => {
+    const oldRun = {
+      id: "run-abandoned",
+      project_id: projectId,
+      status: "queued",
+      created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    };
+    // First list call is the stale-queued sweep; later calls (active-run check) see nothing.
+    vi.mocked(orchestrationQueries.listOrchestrationRunsByProject)
+      .mockResolvedValueOnce([oldRun] as never)
+      .mockResolvedValue([] as never);
+    const updateOrchestrationRun = vi.fn().mockResolvedValue(undefined);
+
+    const mockDb = createMockDbAdapter({ updateOrchestrationRun });
+    const result = await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "workflow",
+      workflow_id: workflowId,
+      trigger_type: "workflow",
+      initiated_by: "user",
+    });
+
+    expect(updateOrchestrationRun).toHaveBeenCalledWith(
+      "run-abandoned",
+      expect.objectContaining({ status: "failed" })
+    );
+    expect(result.error).not.toBe("Build in progress");
+  });
+
+  it("reports build-in-progress when the database rejects a second active run", async () => {
+    // Simulate the race: another trigger inserted an active run after our check passed.
+    vi.mocked(createRunModule.createRun).mockResolvedValueOnce({
+      success: false,
+      error: "UNIQUE constraint failed: orchestration_run.project_id",
+    } as never);
+
+    const mockDb = createMockDbAdapter();
+    const result = await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "workflow",
+      workflow_id: workflowId,
+      trigger_type: "workflow",
+      initiated_by: "user",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Build in progress");
+  });
+
+  it("builds from the resolved clone branch and corrects the project default branch", async () => {
+    const repoManager = await import("@/lib/orchestration/repo-manager");
+    vi.mocked(repoManager.ensureClone).mockReturnValueOnce({
+      success: true,
+      clonePath: "/tmp/dossier/repos/test-project",
+      baseBranch: "master",
+    } as never);
+    vi.mocked(createRunModule.createRun).mockResolvedValueOnce({
+      success: true,
+      runId: "run-master",
+    } as never);
+    const updateProject = vi.fn().mockResolvedValue(undefined);
+
+    const mockDb = createMockDbAdapter({ updateProject });
+    await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "workflow",
+      workflow_id: workflowId,
+      trigger_type: "workflow",
+      initiated_by: "user",
+    });
+
+    expect(updateProject).toHaveBeenCalledWith(projectId, { default_branch: "master" });
+    expect(vi.mocked(createRunModule.createRun)).toHaveBeenLastCalledWith(
+      mockDb,
+      expect.objectContaining({ base_branch: "master" })
+    );
+  });
+
+  it("closes the run when the feature branch cannot be created, so it does not block later builds", async () => {
+    vi.mocked(createRunModule.createRun).mockResolvedValueOnce({
+      success: true,
+      runId: "run-branch-fail",
+    } as never);
+    const repoManager = await import("@/lib/orchestration/repo-manager");
+    vi.mocked(repoManager.createFeatureBranch).mockReturnValueOnce({
+      success: false,
+      error: "origin/main not found",
+    } as never);
+    const updateOrchestrationRun = vi.fn().mockResolvedValue(undefined);
+
+    const mockDb = createMockDbAdapter({ updateOrchestrationRun });
+    const result = await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "workflow",
+      workflow_id: workflowId,
+      trigger_type: "workflow",
+      initiated_by: "user",
+    });
+
+    expect(result.success).toBe(false);
+    expect(updateOrchestrationRun).toHaveBeenCalledWith(
+      "run-branch-fail",
+      expect.objectContaining({ status: "failed" })
     );
   });
 

@@ -17,6 +17,42 @@ const STALE_RUN_MINUTES = parseInt(
 );
 const STALE_RUN_MS = STALE_RUN_MINUTES * 60 * 1000;
 
+/**
+ * A run stays "queued" only between insert and dispatch, which takes seconds in normal flow.
+ * A queued run older than this was abandoned (crash or early failure) and must not block new builds.
+ */
+export const QUEUED_RUN_TIMEOUT_MS = 10 * 60 * 1000;
+
+/**
+ * Marks queued runs older than QUEUED_RUN_TIMEOUT_MS as failed.
+ * Runs in the single-build lock (queued or running) block new builds, so abandoned queued runs must be cleared.
+ */
+export async function abandonStaleQueuedRuns(
+  db: DbAdapter,
+  projectId: string,
+  nowMs: number = Date.now()
+): Promise<number> {
+  const queuedRuns = await listOrchestrationRunsByProject(db, projectId, {
+    status: "queued",
+    limit: 50,
+  });
+
+  let abandoned = 0;
+  for (const run of queuedRuns) {
+    const createdAt = (run as { created_at?: string }).created_at;
+    if (!createdAt) continue;
+    const createdMs = new Date(createdAt).getTime();
+    if (Number.isNaN(createdMs) || nowMs - createdMs <= QUEUED_RUN_TIMEOUT_MS) continue;
+
+    await db.updateOrchestrationRun((run as { id: string }).id, {
+      status: "failed",
+      ended_at: new Date(nowMs).toISOString(),
+    });
+    abandoned++;
+  }
+  return abandoned;
+}
+
 export async function recoverStaleRuns(
   db: DbAdapter,
   projectId: string
