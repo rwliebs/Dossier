@@ -514,6 +514,26 @@ CREATE INDEX IF NOT EXISTS idx_context_artifact_project_id ON context_artifact(p
 ALTER TABLE card_assignment ADD COLUMN session_id TEXT;
 `,
   },
+  {
+    // Single-build lock enforced by the database: at most one active (queued or running) run per project.
+    // Keeps the newest active run per project and marks older duplicates failed so the index can be created.
+    name: "013_single_active_run_per_project.sql",
+    sql: /* sql */ `
+UPDATE orchestration_run
+SET status = 'failed', ended_at = COALESCE(ended_at, datetime('now')), updated_at = datetime('now')
+WHERE id IN (
+  SELECT id FROM (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at DESC, id DESC) AS rn
+    FROM orchestration_run
+    WHERE status IN ('queued', 'running')
+  )
+  WHERE rn > 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orchestration_run_one_active_per_project
+  ON orchestration_run(project_id)
+  WHERE status IN ('queued', 'running');
+`,
+  },
 ];
 
 /** One-time: replace non-UUID workflow, workflow_activity, and card ids with UUIDs so build API and DB stay in sync. */
