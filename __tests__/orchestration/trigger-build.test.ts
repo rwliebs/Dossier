@@ -186,6 +186,35 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     expect(result.error).toBe("Build in progress");
   });
 
+  it("builds from the resolved clone branch and corrects the project default branch", async () => {
+    const repoManager = await import("@/lib/orchestration/repo-manager");
+    vi.mocked(repoManager.ensureClone).mockReturnValueOnce({
+      success: true,
+      clonePath: "/tmp/dossier/repos/test-project",
+      baseBranch: "master",
+    } as never);
+    vi.mocked(createRunModule.createRun).mockResolvedValueOnce({
+      success: true,
+      runId: "run-master",
+    } as never);
+    const updateProject = vi.fn().mockResolvedValue(undefined);
+
+    const mockDb = createMockDbAdapter({ updateProject });
+    await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "workflow",
+      workflow_id: workflowId,
+      trigger_type: "workflow",
+      initiated_by: "user",
+    });
+
+    expect(updateProject).toHaveBeenCalledWith(projectId, { default_branch: "master" });
+    expect(vi.mocked(createRunModule.createRun)).toHaveBeenLastCalledWith(
+      mockDb,
+      expect.objectContaining({ base_branch: "master" })
+    );
+  });
+
   it("closes the run when the feature branch cannot be created, so it does not block later builds", async () => {
     vi.mocked(createRunModule.createRun).mockResolvedValueOnce({
       success: true,
